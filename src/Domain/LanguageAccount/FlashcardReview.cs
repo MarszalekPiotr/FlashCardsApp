@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Domain.LanguageAccount.ValueObjects;
@@ -14,6 +14,8 @@ public class FlashcardReview : Entity
     public DateTime ReviewDate { get; private set; }
     public ReviewResult ReviewResult { get; private set; }
 
+    private FlashcardReview() { } // Required by EF Core
+
     internal FlashcardReview(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult)
     {
         if (reviewDate > DateTime.UtcNow)
@@ -23,7 +25,7 @@ public class FlashcardReview : Entity
 
         ArgumentNullException.ThrowIfNull(reviewResult);
 
-        Id = Guid.NewGuid();
+        //Id = Guid.NewGuid();
         FlashcardId = flashcardId;
         ReviewDate = reviewDate;
         ReviewResult = reviewResult;

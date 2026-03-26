@@ -1,13 +1,15 @@
-﻿using Application.Abstractions.Authentication;
+﻿using System.Data;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Users.DTO;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Users.GetById;
 
-internal sealed class GetUserByIdQueryHandler(IApplicationDbContext context, IUserContext userContext)
+internal sealed class GetUserByIdQueryHandler(IUserContext userContext,IUserReadRepository userReadRepository)
     : IQueryHandler<GetUserByIdQuery, UserResponse>
 {
     public async Task<Result<UserResponse>> Handle(GetUserByIdQuery query, CancellationToken cancellationToken)
@@ -17,22 +19,21 @@ internal sealed class GetUserByIdQueryHandler(IApplicationDbContext context, IUs
             return Result.Failure<UserResponse>(UserErrors.Unauthorized());
         }
 
-        UserResponse? user = await context.Users
-            .Where(u => u.Id == query.UserId)
-            .Select(u => new UserResponse
-            {
-                Id = u.Id,
-                FirstName = u.FirstName,
-                LastName = u.LastName,
-                Email = u.Email.ToString()
-            })
-            .SingleOrDefaultAsync(cancellationToken);
+       UserReadModel user = await userReadRepository.GetById(query.UserId);
 
         if (user is null)
         {
             return Result.Failure<UserResponse>(UserErrors.NotFound(query.UserId));
         }
 
-        return user;
+        var userResponse = new UserResponse
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email.ToString()
+        };     
+
+        return userResponse;
     }
 }

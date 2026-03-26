@@ -2,37 +2,35 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
-using Domain.Users.ValueObjects;
-using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Users.Register;
 
-internal sealed class RegisterUserCommandHandler(IApplicationDbContext context, IPasswordHasher passwordHasher)
+internal sealed class RegisterUserCommandHandler(
+    IPasswordHasher passwordHasher,
+    IUserWriteRepository userWriteRepository,
+    IUnitOfWork unitOfWork)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
-        if (await context.Users.AnyAsync(u => u.Email.ToString() == command.Email, cancellationToken))
+        bool userExists = await userWriteRepository.UserExists(command.Email);
+        if (userExists)
         {
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = new Email(command.Email),
-            FirstName = command.FirstName,
-            LastName = command.LastName,
-            PasswordHash = passwordHasher.Hash(command.Password)
-        };
+          string hashedPassword = passwordHasher.Hash(command.Password);
+   
+            Guid userId = await userWriteRepository.CreateUser(
+                command.Email,
+                command.FirstName,
+                command.LastName,
+                hashedPassword);
 
-        user.Raise(new UserRegisteredDomainEvent(user.Id));
+            await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        context.Users.Add(user);
-
-        await context.SaveChangesAsync(cancellationToken);
-
-        return user.Id;
+            return userId;
+       
     }
 }

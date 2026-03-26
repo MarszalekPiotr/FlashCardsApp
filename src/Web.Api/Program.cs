@@ -27,7 +27,11 @@ app.MapEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwaggerWithUi();
+}
 
+// Apply migrations in Development or when running in Docker
+if (app.Environment.IsDevelopment() || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
+{
     app.ApplyMigrations();
 }
 

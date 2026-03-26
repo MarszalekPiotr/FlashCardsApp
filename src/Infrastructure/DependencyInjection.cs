@@ -1,13 +1,19 @@
-﻿using System.Text;
+﻿using System.Data;
+using System.Text;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
+using Application.LanguageAccounts;
+using Application.Users;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Database;
 using Infrastructure.DomainEvents;
+using Infrastructure.LanguageAccount;
 using Infrastructure.Time;
+using Infrastructure.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
@@ -44,11 +50,28 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(
             options => options
-                .UseNpgsql(connectionString, npgsqlOptions =>
-                    npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default))
-                .UseSnakeCaseNamingConvention());
+                .UseSqlServer(connectionString, sqlServerOptions =>
+                    sqlServerOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, "dbo")));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddScoped<IUserWriteRepository, UserWriteRepository>();
+
+        services.AddScoped<IUserReadRepository, UserReadRepository>();
+
+        services.AddScoped<ILanguageAccountRepository, LanguageAccountRepository>();
+
+        services.AddScoped<IFlashcardCollectionRepository, FlashcardCollectionRepository>();
+
+        services.AddScoped<IFlashcardCollectionReadRepository, FlashcardCollectionReadRepository>();
+
+        services.AddScoped<IFlashcardRepository, FlashcardRepository>();
+
+        services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
+
+        services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 
         return services;
     }
@@ -57,7 +80,7 @@ public static class DependencyInjection
     {
         services
             .AddHealthChecks()
-            .AddNpgSql(configuration.GetConnectionString("Database")!);
+            .AddSqlServer(configuration.GetConnectionString("Database")!);
 
         return services;
     }

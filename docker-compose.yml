@@ -7,24 +7,32 @@ services:
       dockerfile: src/Web.Api/Dockerfile
     ports:
       - 5000:8080
-      - 5001:8081
-
-  postgres:
-    image: postgres:17
-    container_name: postgres
+    depends_on:
+      - mssql
+      - seq
     environment:
-      - POSTGRES_DB=clean-architecture
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    volumes:
-      - ./.containers/db:/var/lib/postgresql/data
-    ports:
-      - 5432:5432
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
 
-  seq:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Developer
+    volumes:
+          - mssql-data:/var/opt/mssql
+    ports:
+      - 1433:1433
+
+  seq:  
     image: datalust/seq:2024.3
     container_name: seq
     environment:
       - ACCEPT_EULA=Y
     ports:
       - 8081:80
+
+volumes:
+  mssql-data:

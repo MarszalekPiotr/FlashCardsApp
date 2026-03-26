@@ -8,15 +8,14 @@ using SharedKernel;
 namespace Application.Users.Login;
 
 internal sealed class LoginUserCommandHandler(
-    IApplicationDbContext context,
+    IUserWriteRepository userWriteRepository,
+    IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ITokenProvider tokenProvider) : ICommandHandler<LoginUserCommand, string>
 {
     public async Task<Result<string>> Handle(LoginUserCommand command, CancellationToken cancellationToken)
     {
-        User? user = await context.Users
-            .AsNoTracking()
-            .SingleOrDefaultAsync(u => u.Email.ToString() == command.Email, cancellationToken);
+        User? user = await userWriteRepository.GetUserByEmail(command.Email, cancellationToken);
 
         if (user is null)
         {
