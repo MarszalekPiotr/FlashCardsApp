@@ -35,3 +35,13 @@ public class FlashcardDetailReadModel
     public string Answer { get; set; } = string.Empty;
     public List<string> Synonyms { get; set; } = [];
 }
+
+public class DueFlashcardReadModel
+{
+    public Guid Id { get; set; }
+    public string SentenceWithBlanks { get; set; } = string.Empty;
+    public string Translation { get; set; } = string.Empty;
+    public string Answer { get; set; } = string.Empty;
+    public List<string> Synonyms { get; set; } = [];
+    public DateTime? NextReviewDate { get; set; }
+}

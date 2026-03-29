@@ -25,7 +25,7 @@ public class FlashcardReview : Entity
 
         ArgumentNullException.ThrowIfNull(reviewResult);
 
-        //Id = Guid.NewGuid();
+        Id = Guid.NewGuid();
         FlashcardId = flashcardId;
         ReviewDate = reviewDate;
         ReviewResult = reviewResult;

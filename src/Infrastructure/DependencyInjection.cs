@@ -3,12 +3,15 @@ using System.Text;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.LanguageAccounts;
+using Application.SRS;
 using Application.Users;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Database;
 using Infrastructure.DomainEvents;
 using Infrastructure.LanguageAccount;
+using Application.SRS;
+using Infrastructure.SRS;
 using Infrastructure.Time;
 using Infrastructure.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -68,6 +71,10 @@ public static class DependencyInjection
         services.AddScoped<IFlashcardCollectionReadRepository, FlashcardCollectionReadRepository>();
 
         services.AddScoped<IFlashcardRepository, FlashcardRepository>();
+
+        services.AddScoped<IFlashcardReviewRepository, FlashcardReviewRepository>();
+
+        services.AddScoped<ISrsStateRepository, SrsStateRepository>();
 
         services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
 

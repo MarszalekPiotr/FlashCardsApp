@@ -131,4 +131,49 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
         public string Answer { get; set; } = string.Empty;
         public string? Synonyms { get; set; }
     }
+
+    public async Task<List<DueFlashcardReadModel>> GetDueFlashcardsAsync(Guid collectionId, Guid userId)
+    {
+        string sql = @"
+            SELECT
+                f.Id,
+                f.SentenceWithBlanks,
+                f.Translation,
+                f.Answer,
+                f.Synonyms,
+                ss.NextReviewDate
+            FROM dbo.Flashcards f
+            INNER JOIN dbo.FlashcardCollections fc ON fc.Id = f.FlashcardCollectionId
+            INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
+            LEFT JOIN dbo.SrsStates ss ON ss.FlashcardId = f.Id
+            WHERE f.FlashcardCollectionId = @CollectionId
+              AND la.UserId = @UserId
+              AND (ss.NextReviewDate IS NULL OR ss.NextReviewDate <= GETUTCDATE())";
+
+        IEnumerable<DueFlashcardRawRow> rows = await _dbConnection.QueryAsync<DueFlashcardRawRow>(
+            sql,
+            new { CollectionId = collectionId, UserId = userId });
+
+        return rows
+            .Select(r => new DueFlashcardReadModel
+            {
+                Id = r.Id,
+                SentenceWithBlanks = r.SentenceWithBlanks,
+                Translation = r.Translation,
+                Answer = r.Answer,
+                Synonyms = JsonSerializer.Deserialize<List<string>>(r.Synonyms ?? "[]") ?? [],
+                NextReviewDate = r.NextReviewDate
+            })
+            .ToList();
+    }
+
+    private sealed class DueFlashcardRawRow
+    {
+        public Guid Id { get; set; }
+        public string SentenceWithBlanks { get; set; } = string.Empty;
+        public string Translation { get; set; } = string.Empty;
+        public string Answer { get; set; } = string.Empty;
+        public string? Synonyms { get; set; }
+        public DateTime? NextReviewDate { get; set; }
+    }
 }

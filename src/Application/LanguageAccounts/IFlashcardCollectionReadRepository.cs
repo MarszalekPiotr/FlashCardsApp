@@ -11,4 +11,6 @@ public interface IFlashcardCollectionReadRepository
     Task<FlashcardCollectionDetailReadModel?> GetByIdAsync(Guid id);
 
     Task<FlashcardDetailReadModel?> GetFlashcardByIdAsync(Guid flashcardId);
+
+    Task<List<DueFlashcardReadModel>> GetDueFlashcardsAsync(Guid collectionId, Guid userId);
 }

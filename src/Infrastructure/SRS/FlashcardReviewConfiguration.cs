@@ -17,10 +17,8 @@ internal sealed class FlashcardReviewConfiguration : IEntityTypeConfiguration<Fl
                 value => new ReviewResult(value))
             .IsRequired();
 
-        builder.Property(fr => fr.ReviewDate)
-            .IsRequired();
+        builder.Property(fr => fr.ReviewDate).IsRequired();
 
-        builder.Property(fr => fr.FlashcardId)
-            .IsRequired();
+        builder.Property(fr => fr.FlashcardId).IsRequired();
     }
 }

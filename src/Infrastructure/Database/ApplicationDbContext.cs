@@ -25,6 +25,8 @@ public sealed class ApplicationDbContext(
 
     public DbSet<Flashcard> Flashcards { get; set; }
 
+    public DbSet<Domain.SRS.SrsState> SrsStates { get; set; }
+
     public DbSet<Domain.SRS.FlashcardReview> FlashcardReviews { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
