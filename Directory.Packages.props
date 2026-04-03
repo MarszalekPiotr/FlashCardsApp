@@ -6,7 +6,7 @@
   <ItemGroup>
     <!-- Static code analysis -->
     <PackageVersion Include="Dapper" Version="2.1.72" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.19.0.132793" />
     <!-- Application -->
     <PackageVersion Include="Scrutor" Version="7.0.0" />
