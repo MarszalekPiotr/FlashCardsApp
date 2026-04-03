@@ -13,6 +13,7 @@ internal sealed class Rename : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPut("language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}", async (
+            Guid languageAccountId,
             Guid collectionId,
             Request request,
             ICommandHandler<RenameFlashcardCollectionCommand> handler,

@@ -13,6 +13,8 @@ internal sealed class GetById : IEndpoint
         app.MapGet(
             "language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards/{flashcardId:guid}",
             async (
+                Guid languageAccountId,
+                Guid collectionId,
                 Guid flashcardId,
                 IQueryHandler<GetFlashcardByIdQuery, FlashcardDetailResponse> handler,
                 CancellationToken cancellationToken) =>

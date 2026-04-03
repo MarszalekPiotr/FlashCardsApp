@@ -13,6 +13,7 @@ internal sealed class GetDue : IEndpoint
         app.MapGet(
             "language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards/due",
             async (
+                Guid languageAccountId,
                 Guid collectionId,
                 IQueryHandler<GetDueFlashcardsQuery, List<DueFlashcardResponse>> handler,
                 CancellationToken cancellationToken) =>

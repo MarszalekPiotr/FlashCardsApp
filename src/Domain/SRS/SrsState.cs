@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Domain.LanguageAccount.Enums;
 using SharedKernel;
+using Domain.SRS.Enums;
 
 namespace Domain.SRS;
 
@@ -39,7 +37,7 @@ public class SrsState : Entity
     {
         const double minEaseFactor = 1.3;
 
-        if (reviewResult.Value is (Enums.ReviewResult)ReviewResult.Again or (Enums.ReviewResult)ReviewResult.DontKnow)
+        if (reviewResult.Value is ReviewResult.Again or ReviewResult.DontKnow)
         {
             Repetitions = 0;
             Interval = 1;
@@ -62,11 +60,11 @@ public class SrsState : Entity
                 Interval = (int)Math.Round(Interval * EaseFactor);
             }
 
-            if (reviewResult.Value is (Enums.ReviewResult) ReviewResult.Easy)
+            if (reviewResult.Value is ReviewResult.Easy)
             {
                 EaseFactor += 0.15;
             }
-            else if (reviewResult.Value is (Enums.ReviewResult)ReviewResult.Know)
+            else if (reviewResult.Value is ReviewResult.Know)
             {
                 EaseFactor += 0.05;
             }

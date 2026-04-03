@@ -17,6 +17,7 @@ internal sealed class AddFlashcard : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards", async (
+            Guid languageAccountId,
             Guid collectionId,
             Request request,
             ICommandHandler<AddFlashcardToCollectionCommand, Guid> handler,

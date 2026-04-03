@@ -1,8 +1,7 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
-
+using Microsoft.OpenApi.Models;
 
 namespace Web.Api.Extensions;
 
@@ -14,16 +13,18 @@ internal static class ServiceCollectionExtensions
         {
             o.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
 
-            o.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
+            // 🔐 Security Definition
+            o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Name = "Authorization",
-                Description = "Enter your JWT token in this field",
+                Description = "Enter 'Bearer {your JWT token}'",
                 In = ParameterLocation.Header,
                 Type = SecuritySchemeType.Http,
-                Scheme = JwtBearerDefaults.AuthenticationScheme,
+                Scheme = "bearer",
                 BearerFormat = "JWT"
             });
 
+            // 🔐 Apply to endpoints with [Authorize]
             o.OperationFilter<SecurityRequirementsOperationFilter>();
         });
 
@@ -34,20 +35,28 @@ internal static class ServiceCollectionExtensions
     {
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            IReadOnlyList<object> endpointMetadata = context.ApiDescription.ActionDescriptor.EndpointMetadata.ToList();
+            var endpointMetadata = context.ApiDescription.ActionDescriptor.EndpointMetadata;
 
-            bool hasAuthorizeData = endpointMetadata.OfType<IAuthorizeData>().Any();
-            bool hasAllowAnonymous = endpointMetadata.OfType<IAllowAnonymous>().Any();
+            bool hasAuthorize = endpointMetadata.OfType<IAuthorizeData>().Any();
+            bool allowAnonymous = endpointMetadata.OfType<IAllowAnonymous>().Any();
 
-            if (hasAuthorizeData && !hasAllowAnonymous)
+            if ( true /*hasAuthorize && !allowAnonymous*/)
             {
-                operation.Security =
-                [
-                    new OpenApiSecurityRequirement
-                    {
-                        [new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, null)] = []
-                    }
-                ];
+                operation.Security ??= new List<OpenApiSecurityRequirement>();
+
+                operation.Security.Add(new OpenApiSecurityRequirement
+                {
+                    [
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        }
+                    ] = new List<string>()
+                });
             }
         }
     }

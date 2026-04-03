@@ -11,6 +11,7 @@ internal sealed class Delete : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapDelete("language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}", async (
+            Guid languageAccountId,
             Guid collectionId,
             ICommandHandler<DeleteFlashcardCollectionCommand> handler,
             CancellationToken cancellationToken) =>

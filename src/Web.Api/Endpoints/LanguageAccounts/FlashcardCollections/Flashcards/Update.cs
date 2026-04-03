@@ -19,6 +19,8 @@ internal sealed class Update : IEndpoint
         app.MapPut(
             "language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards/{flashcardId:guid}",
             async (
+                Guid languageAccountId,
+                Guid collectionId,
                 Guid flashcardId,
                 Request request,
                 ICommandHandler<UpdateFlashcardCommand> handler,

@@ -13,6 +13,8 @@ internal sealed class Delete : IEndpoint
         app.MapDelete(
             "language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards/{flashcardId:guid}",
             async (
+                Guid languageAccountId,
+                Guid collectionId,
                 Guid flashcardId,
                 ICommandHandler<DeleteFlashcardCommand> handler,
                 CancellationToken cancellationToken) =>

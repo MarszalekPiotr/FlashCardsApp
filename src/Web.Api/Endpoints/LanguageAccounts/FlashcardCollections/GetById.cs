@@ -11,6 +11,7 @@ internal sealed class GetById : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}", async (
+            Guid languageAccountId,
             Guid collectionId,
             IQueryHandler<GetFlashcardCollectionByIdQuery, FlashcardCollectionDetailResponse> handler,
             CancellationToken cancellationToken) =>

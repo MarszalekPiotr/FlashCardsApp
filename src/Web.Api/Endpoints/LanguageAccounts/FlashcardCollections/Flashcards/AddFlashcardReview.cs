@@ -15,6 +15,8 @@ internal sealed class AddFlashcardReview : IEndpoint
         app.MapPost(
             "language-accounts/{languageAccountId:guid}/collections/{collectionId:guid}/flashcards/{flashcardId:guid}/reviews",
             async (
+                Guid languageAccountId,
+                Guid collectionId,
                 Guid flashcardId,
                 Request request,
                 ICommandHandler<AddFlashcardReviewCommand, Guid> handler,

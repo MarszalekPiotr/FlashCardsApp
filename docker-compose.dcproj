@@ -10,6 +10,7 @@
     <DockerComposeProjectName>clean-architecture</DockerComposeProjectName>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="AI\architectural-review-and-refactoring-plan.md" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
