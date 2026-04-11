@@ -10,7 +10,7 @@ namespace Application.Users;
 
 public interface IUserWriteRepository
 {
-      Task<Guid> CreateUser (string email, string firstName, string lastName, string passwordHash);
+      Task<Guid> AddAsync (User user);
       Task<bool> UserExists(string email);
-     Task<User?>  GetUserByEmail(string email, CancellationToken cancellationToken);
+      Task<User?>  GetUserByEmail(string email, CancellationToken cancellationToken);
 }

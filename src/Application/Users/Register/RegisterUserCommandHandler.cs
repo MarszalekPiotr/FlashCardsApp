@@ -2,6 +2,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
+using Domain.Users.ValueObjects;
 using SharedKernel;
 
 namespace Application.Users.Register;
@@ -21,12 +22,14 @@ internal sealed class RegisterUserCommandHandler(
         }
 
           string hashedPassword = passwordHasher.Hash(command.Password);
-   
-            Guid userId = await userWriteRepository.CreateUser(
-                command.Email,
-                command.FirstName,
-                command.LastName,
-                hashedPassword);
+
+          var user = User.Create(
+              new Email(command.Email),
+              command.FirstName,
+              command.LastName,
+              hashedPassword);
+
+            Guid userId = await userWriteRepository.AddAsync(user);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
 

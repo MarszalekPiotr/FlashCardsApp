@@ -14,12 +14,11 @@ public class UserWriteRepository : BaseWriteRepository, IUserWriteRepository
     {
     }
 
-    public async Task<Guid> CreateUser(string email, string firstName, string lastName, string passwordHash)
+    public async Task<Guid> AddAsync(User user)
     {
-        var user = User.Create(new Email(email), firstName, lastName, passwordHash);
-        await _applicationDbContext.Users.AddAsync(user);
+        var userId = await _applicationDbContext.Users.AddAsync(user);
+        return userId.Entity.Id;
 
-        return user.Id;
     }
 
     public async Task<User?> GetUserByEmail(string email, CancellationToken cancellationToken)

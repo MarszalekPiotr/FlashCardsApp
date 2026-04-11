@@ -48,10 +48,9 @@ public sealed class ApplicationDbContext(
         //     - eventual consistency
         //     - handlers can fail
 
-        int result = await base.SaveChangesAsync(cancellationToken);
 
         await PublishDomainEventsAsync();
-
+        int result = await base.SaveChangesAsync(cancellationToken);
         return result;
     }
 

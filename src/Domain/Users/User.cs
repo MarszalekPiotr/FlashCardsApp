@@ -13,7 +13,6 @@ public sealed class User : Entity
 
     private User(Email email, string firstName, string lastName, string passwordHash)
     {
-        //Id = Guid.NewGuid();
         Email = email;
         FirstName = firstName;
         LastName = lastName;

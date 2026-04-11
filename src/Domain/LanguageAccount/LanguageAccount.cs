@@ -20,7 +20,6 @@ public class LanguageAccount : Entity
 
     private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Language language)
     {
-        //Id = Guid.NewGuid();
         UserId = userId;
         ProficiencyLevel = proficiencyLevel;
         Language = language;
