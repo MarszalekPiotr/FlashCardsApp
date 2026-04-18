@@ -9,7 +9,6 @@ namespace Application.Users.Login;
 
 internal sealed class LoginUserCommandHandler(
     IUserWriteRepository userWriteRepository,
-    IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ITokenProvider tokenProvider) : ICommandHandler<LoginUserCommand, string>
 {

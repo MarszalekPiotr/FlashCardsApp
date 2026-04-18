@@ -18,7 +18,6 @@ public sealed class User : Entity
         LastName = lastName;
         PasswordHash = passwordHash;
 
-        Raise(new UserRegisteredDomainEvent(Id));
     }
 
     public static User Create(Email email, string firstName, string lastName, string passwordHash)

@@ -11,7 +11,7 @@ namespace Application.LanguageAccounts.Commands.CreateLanguageAccount;
 
 internal sealed class CreateLanguageAccountCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<CreateLanguageAccountCommand, Guid>
 {
@@ -28,7 +28,7 @@ internal sealed class CreateLanguageAccountCommandHandler(
             language);
 
         languageAccountRepository.Add(account);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return account.Id;
     }

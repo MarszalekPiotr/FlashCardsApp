@@ -10,7 +10,7 @@ namespace Application.LanguageAccounts.Commands.DeleteFlashcardCollection;
 
 internal sealed class DeleteFlashcardCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<DeleteFlashcardCollectionCommand>
 {
@@ -30,7 +30,7 @@ internal sealed class DeleteFlashcardCollectionCommandHandler(
         }
 
         flashcardCollectionRepository.Remove(collection);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

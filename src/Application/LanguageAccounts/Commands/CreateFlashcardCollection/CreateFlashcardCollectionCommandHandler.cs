@@ -10,7 +10,7 @@ namespace Application.LanguageAccounts.Commands.CreateFlashcardCollection;
 
 internal sealed class CreateFlashcardCollectionCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<CreateFlashcardCollectionCommand, Guid>
 {
@@ -32,7 +32,7 @@ internal sealed class CreateFlashcardCollectionCommandHandler(
         FlashcardCollection collection = languageAccount.CreateCollection(command.Name);
 
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return collection.Id;
     }

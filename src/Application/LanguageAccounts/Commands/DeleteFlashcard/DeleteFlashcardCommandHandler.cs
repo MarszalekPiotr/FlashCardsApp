@@ -9,7 +9,7 @@ namespace Application.LanguageAccounts.Commands.DeleteFlashcard;
 
 internal sealed class DeleteFlashcardCommandHandler(
     IFlashcardRepository flashcardRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<DeleteFlashcardCommand>
 {
@@ -29,7 +29,7 @@ internal sealed class DeleteFlashcardCommandHandler(
         }
 
         flashcardRepository.Remove(flashcard);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

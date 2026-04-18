@@ -12,7 +12,7 @@ namespace Application.LanguageAccounts.Commands.AddFlashcardReview;
 internal sealed class AddFlashcardReviewCommandHandler(
     IFlashcardRepository flashcardRepository,
     IFlashcardReviewRepository flashcardReviewRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<AddFlashcardReviewCommand, Guid>
 {
@@ -30,7 +30,7 @@ internal sealed class AddFlashcardReviewCommandHandler(
         var review = Domain.SRS.FlashcardReview.Create(command.FlashcardId, DateTime.UtcNow, reviewResult);
 
         flashcardReviewRepository.Add(review);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return review.Id;
     }

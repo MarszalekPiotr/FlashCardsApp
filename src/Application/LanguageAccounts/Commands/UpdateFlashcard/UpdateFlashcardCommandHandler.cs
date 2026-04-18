@@ -10,7 +10,7 @@ namespace Application.LanguageAccounts.Commands.UpdateFlashcard;
 
 internal sealed class UpdateFlashcardCommandHandler(
     IFlashcardRepository flashcardRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<UpdateFlashcardCommand>
 {
@@ -39,7 +39,7 @@ internal sealed class UpdateFlashcardCommandHandler(
             return Result.Failure(Error.Problem("Flashcards.InvalidInput", ex.Message));
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

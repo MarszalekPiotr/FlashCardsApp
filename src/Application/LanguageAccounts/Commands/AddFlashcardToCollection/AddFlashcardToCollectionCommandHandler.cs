@@ -11,7 +11,7 @@ namespace Application.LanguageAccounts.Commands.AddFlashcardToCollection;
 
 internal sealed class AddFlashcardToCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<AddFlashcardToCollectionCommand, Guid>
 {
@@ -37,7 +37,7 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
             command.Answer,
             synonyms);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return flashcard.Id;
     }

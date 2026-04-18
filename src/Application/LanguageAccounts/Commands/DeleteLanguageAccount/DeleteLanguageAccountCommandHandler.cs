@@ -10,7 +10,7 @@ namespace Application.LanguageAccounts.Commands.DeleteLanguageAccount;
 
 internal sealed class DeleteLanguageAccountCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<DeleteLanguageAccountCommand>
 {
@@ -30,7 +30,7 @@ internal sealed class DeleteLanguageAccountCommandHandler(
         }
 
         languageAccountRepository.Remove(account);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

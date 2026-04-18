@@ -10,7 +10,7 @@ namespace Application.LanguageAccounts.Commands.RenameFlashcardCollection;
 
 internal sealed class RenameFlashcardCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<RenameFlashcardCollectionCommand>
 {
@@ -30,7 +30,7 @@ internal sealed class RenameFlashcardCollectionCommandHandler(
         }
 
         collection.Rename(command.Name);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

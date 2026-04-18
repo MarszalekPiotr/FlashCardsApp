@@ -8,7 +8,7 @@ namespace Application.LanguageAccounts.Events;
 
 internal sealed class FlashcardReviewedDomainEventHandler(
     ISrsStateRepository srsStateRepository,
-    IUnitOfWork unitOfWork)
+    IApplicationDbContext applicationDbContext)
     : IDomainEventHandler<FlashcardReviewedDomainEvent>
 {
     public async Task Handle(FlashcardReviewedDomainEvent domainEvent, CancellationToken cancellationToken)
@@ -26,6 +26,6 @@ internal sealed class FlashcardReviewedDomainEventHandler(
 
         srsState.UpdateState(reviewResult);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
     }
 }
