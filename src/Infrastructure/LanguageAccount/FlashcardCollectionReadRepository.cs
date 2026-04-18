@@ -1,7 +1,7 @@
 using System.Data;
 using System.Text.Json;
-using Application.LanguageAccounts;
-using Application.LanguageAccounts.DTO;
+using Application.FlashcardCollection;
+using Application.FlashcardCollection.Queries;
 using Dapper;
 
 namespace Infrastructure.LanguageAccount;

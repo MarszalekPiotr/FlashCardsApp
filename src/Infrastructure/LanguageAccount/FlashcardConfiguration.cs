@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Domain.LanguageAccount;
+using Domain.FlashcardCollection;
 using Domain.LanguageAccount.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -33,6 +33,11 @@ internal class FlashcardConfiguration : IEntityTypeConfiguration<Flashcard>
         builder.HasOne(f => f.FlashcardCollection)
             .WithMany(fc => fc.Flashcards)
             .HasForeignKey(f => f.FlashcardCollectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(f => f.SrsState)
+            .WithOne()
+            .HasForeignKey<Flashcard>(f => f.Id)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

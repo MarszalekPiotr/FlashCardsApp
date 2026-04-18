@@ -1,4 +1,4 @@
-﻿using Domain.SRS;
+﻿using Domain.FlashcardCollection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,7 +15,7 @@ internal sealed class SrsStateConfiguration : IEntityTypeConfiguration<SrsState>
         builder.Property(s => s.Repetitions).IsRequired();
         builder.Property(s => s.NextReviewDate).IsRequired();
 
-        builder.HasOne<Domain.LanguageAccount.Flashcard>()
+        builder.HasOne<Flashcard>()
             .WithOne()
             .HasForeignKey<SrsState>(s => s.FlashcardId)
             .OnDelete(DeleteBehavior.Cascade);

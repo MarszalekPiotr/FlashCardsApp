@@ -17,4 +17,10 @@
 	<InternalsVisibleTo Include="Application.UnitTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="FlashcardCollection\DTO\" />
+    <Folder Include="FlashcardCollection\Commands\Events\" />
+    <Folder Include="SRS\" />
+  </ItemGroup>
+
 </Project>

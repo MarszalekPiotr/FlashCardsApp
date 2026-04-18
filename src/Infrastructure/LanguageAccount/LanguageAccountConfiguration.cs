@@ -25,13 +25,6 @@ public class LanguageAccountConfiguration : IEntityTypeConfiguration<Domain.Lang
                 value => new ProficiencyLevel(value))
             .IsRequired();
 
-        builder.HasMany(la => la.FlashcardCollections)
-               .WithOne(fc => fc.LanguageAccount)
-               .HasForeignKey(fc => fc.LanguageAccountId)
-               .OnDelete(DeleteBehavior.Cascade);
-
-        builder.Navigation(la => la.FlashcardCollections)
-            .HasField("_flashcardCollections")
-            .UsePropertyAccessMode(PropertyAccessMode.Field);
+        
     }
 }

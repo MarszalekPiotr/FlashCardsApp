@@ -1,7 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Repository;
-using Application.LanguageAccounts;
-using Domain.LanguageAccount;
+using Application.FlashcardCollection;
+using Domain.FlashcardCollection;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.LanguageAccount;
@@ -12,10 +12,21 @@ public class FlashcardCollectionRepository : BaseWriteRepository, IFlashcardColl
     {
     }
 
-    public async Task<FlashcardCollection?> GetByIdWithLanguageAccountAsync(Guid id, CancellationToken cancellationToken)
+    public void Add(FlashcardCollection collection)
+    {
+        _applicationDbContext.FlashcardCollections.Add(collection);
+    }
+
+    public async Task<FlashcardCollection?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _applicationDbContext.FlashcardCollections
-            .Include(fc => fc.LanguageAccount)
+            .SingleOrDefaultAsync(fc => fc.Id == id, cancellationToken);
+    }
+
+    public async Task<FlashcardCollection?> GetByIdWithSingleFlashcardAsync(Guid id, Guid flashcardId, CancellationToken cancellationToken)
+    {
+        return await _applicationDbContext.FlashcardCollections
+            .Include(fc => fc.Flashcards.Where(f => f.Id == flashcardId)).ThenInclude(f => f.SrsState)
             .SingleOrDefaultAsync(fc => fc.Id == id, cancellationToken);
     }
 

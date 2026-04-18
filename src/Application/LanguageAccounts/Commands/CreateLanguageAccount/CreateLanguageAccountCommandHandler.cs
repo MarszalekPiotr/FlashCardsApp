@@ -6,6 +6,7 @@ using Application.Shared;
 using Application.Shared.DTO;
 using Domain.LanguageAccount;
 using Domain.LanguageAccount.Enums;
+using Domain.LanguageAccount.Events;
 using Domain.LanguageAccount.ValueObjects;
 using SharedKernel;
 using SharedKernel.SharedEntities.Language;
@@ -39,6 +40,8 @@ internal sealed class CreateLanguageAccountCommandHandler(
 
         languageAccountRepository.Add(account);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
+
+        account.Raise(new LanguageAccountCreatedDomainEvent(account.Id));
 
         return account.Id;
     }

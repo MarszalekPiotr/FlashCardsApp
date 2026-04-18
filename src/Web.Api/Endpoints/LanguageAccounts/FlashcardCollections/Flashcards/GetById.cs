@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Queries.GetFlashcardById;
+using Application.FlashcardCollection.Queries.GetFlashcardById;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;

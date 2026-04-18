@@ -1,5 +1,4 @@
-﻿using Domain.LanguageAccount;
-using Domain.SRS;
+﻿using Domain.FlashcardCollection;
 using Domain.Todos;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -12,9 +11,9 @@ public interface IApplicationDbContext
     DbSet<User> Users { get; }
     DbSet<TodoItem> TodoItems { get; }
     DbSet<Domain.LanguageAccount.LanguageAccount> LanguageAccounts { get; }
-    DbSet<FlashcardCollection> FlashcardCollections { get; }
+    DbSet<Domain.FlashcardCollection.FlashcardCollection> FlashcardCollections { get; }
     DbSet<Flashcard> Flashcards { get; }
-    DbSet<Domain.SRS.FlashcardReview> FlashcardReviews { get; }
+    DbSet<FlashcardReview> FlashcardReviews { get; }
     DbSet<SrsState> SrsStates { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

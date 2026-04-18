@@ -1,30 +1,53 @@
 using Application.Abstractions.Data;
-using Application.SRS;
-using Domain.SRS.Events;
-using Domain.SRS;
 using SharedKernel;
+using Domain.FlashcardCollection;
+using Domain.FlashcardCollection.Enums;
+using Domain.FlashcardCollection.Events;
+using Application.FlashcardCollection;
+using Domain.FlashcardCollection.DomainServices;
 
 namespace Application.LanguageAccounts.Events;
 
 internal sealed class FlashcardReviewedDomainEventHandler(
-    ISrsStateRepository srsStateRepository,
-    IApplicationDbContext applicationDbContext)
+    IFlashcardCollectionRepository flashcardCollectionWriteRepository,
+    IApplicationDbContext applicationDbContext,
+    SrsCalculationService srsCalculationService,
+    IDateTimeProvider dateTimeProvider)
     : IDomainEventHandler<FlashcardReviewedDomainEvent>
 {
     public async Task Handle(FlashcardReviewedDomainEvent domainEvent, CancellationToken cancellationToken)
     {
-        SrsState? srsState = await srsStateRepository.GetByFlashcardIdAsync(domainEvent.FlashcardId, cancellationToken);
+        var collection  = await flashcardCollectionWriteRepository.GetByIdWithSingleFlashcardAsync(domainEvent.FlashcardCollectionId,domainEvent.FlashcardId,cancellationToken);
+
+        if (collection is null)
+        {
+            // Log warning or throw exception
+            return;
+        }
+
+        var flashcard = collection.Flashcards.FirstOrDefault(f => f.Id == domainEvent.FlashcardId); 
+
+        if (flashcard is null)
+        {
+            // Log warning or throw exception
+            return;
+        }
+
+        var srsState = flashcard.SrsState;
 
         if (srsState is null)
         {
-            srsState = SrsState.CreateInitialState(domainEvent.FlashcardId);
-            srsStateRepository.Add(srsState);
+            srsState = SrsState.CreateInitialState(domainEvent.FlashcardId, dateTimeProvider);
+            flashcard.SetSrsState(srsState);
+
         }
 
-        var reviewResult = new Domain.SRS.ValueObjects.ReviewResult(
-            (Domain.SRS.Enums.ReviewResult)domainEvent.ReviewResultValue);
+        var reviewResult = (ReviewResult)domainEvent.ReviewResult;
 
-        srsState.UpdateState(reviewResult);
+        /// dodac serwi domenowy do obliczania nowego stanu SRS na podstawie wyniku recenzji
+        SrsStateCalculation newSrsState = srsCalculationService.CalculateNextState(srsState, reviewResult,dateTimeProvider.UtcNow );
+
+        srsState.UpdateState(newSrsState);
 
         await applicationDbContext.SaveChangesAsync(cancellationToken);
     }

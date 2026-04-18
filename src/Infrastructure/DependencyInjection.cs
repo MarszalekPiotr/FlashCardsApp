@@ -3,14 +3,12 @@ using System.Text;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.LanguageAccounts;
-using Application.SRS;
 using Application.Users;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Database;
 using Infrastructure.DomainEvents;
 using Infrastructure.LanguageAccount;
-using Application.SRS;
 using Infrastructure.SRS;
 using Infrastructure.Time;
 using Infrastructure.Users;
@@ -23,6 +21,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using SharedKernel;
+using Application.FlashcardCollection;
 
 namespace Infrastructure;
 
@@ -67,12 +66,6 @@ public static class DependencyInjection
         services.AddScoped<IFlashcardCollectionRepository, FlashcardCollectionRepository>();
 
         services.AddScoped<IFlashcardCollectionReadRepository, FlashcardCollectionReadRepository>();
-
-        services.AddScoped<IFlashcardRepository, FlashcardRepository>();
-
-        services.AddScoped<IFlashcardReviewRepository, FlashcardReviewRepository>();
-
-        services.AddScoped<ISrsStateRepository, SrsStateRepository>();
 
         services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
 

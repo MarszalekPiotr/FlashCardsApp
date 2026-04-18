@@ -1,6 +1,7 @@
-using Domain.LanguageAccount;
+using Domain.FlashcardCollection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Domain.LanguageAccount;
 
 namespace Infrastructure.LanguageAccount;
 
@@ -13,6 +14,11 @@ internal sealed class FlashcardCollectionConfiguration : IEntityTypeConfiguratio
         builder.Property(fc => fc.Name)
             .IsRequired()
             .HasMaxLength(200);
+       
+        builder.HasOne<Domain.LanguageAccount.LanguageAccount>()
+            .WithMany()
+            .HasForeignKey(fc => fc.LanguageAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(fc => fc.Flashcards)
             .WithOne(f => f.FlashcardCollection)

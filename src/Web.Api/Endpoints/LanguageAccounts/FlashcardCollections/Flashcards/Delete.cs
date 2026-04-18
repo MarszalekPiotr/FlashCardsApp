@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.DeleteFlashcard;
+using Application.FlashcardCollection.Commands.DeleteFlashcard;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -19,7 +19,7 @@ internal sealed class Delete : IEndpoint
                 ICommandHandler<DeleteFlashcardCommand> handler,
                 CancellationToken cancellationToken) =>
             {
-                var command = new DeleteFlashcardCommand(flashcardId);
+                var command = new DeleteFlashcardCommand(collectionId,flashcardId);
 
                 Result result = await handler.Handle(command, cancellationToken);
 

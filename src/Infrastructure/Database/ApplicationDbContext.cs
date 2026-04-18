@@ -1,6 +1,5 @@
 ﻿using Application.Abstractions.Data;
-using Domain.LanguageAccount;
-using Domain.SRS;
+using Domain.FlashcardCollection;
 using Domain.Todos;
 using Domain.Users;
 using Infrastructure.DomainEvents;
@@ -25,9 +24,9 @@ public sealed class ApplicationDbContext(
 
     public DbSet<Flashcard> Flashcards { get; set; }
 
-    public DbSet<Domain.SRS.SrsState> SrsStates { get; set; }
+    public DbSet<SrsState> SrsStates { get; set; }
 
-    public DbSet<Domain.SRS.FlashcardReview> FlashcardReviews { get; set; }
+    public DbSet<FlashcardReview> FlashcardReviews { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
