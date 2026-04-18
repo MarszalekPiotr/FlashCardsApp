@@ -11,26 +11,25 @@ public class LanguageAccount : Entity
     public Guid UserId { get; private set; }
     public User? User { get; private set; }
     public ProficiencyLevel ProficiencyLevel { get; private set; }
-    public Language Language { get; private set; }
+    public Guid LanguageId { get; private set; }
 
     private readonly List<FlashcardCollection> _flashcardCollections = new();
     public IReadOnlyCollection<FlashcardCollection> FlashcardCollections => _flashcardCollections.AsReadOnly();
 
     private LanguageAccount() { } // Required by EF Core
 
-    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Language language)
+    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
     {
         UserId = userId;
         ProficiencyLevel = proficiencyLevel;
-        Language = language;
+        LanguageId = languageId;
         Raise(new LanguageAccountCreatedDomainEvent(Id));
     }
 
-    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Language language)
+    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
     {
-        ArgumentNullException.ThrowIfNull(proficiencyLevel);
-        ArgumentNullException.ThrowIfNull(language);      
-        return new LanguageAccount(userId, proficiencyLevel, language);
+        ArgumentNullException.ThrowIfNull(proficiencyLevel);    
+        return new LanguageAccount(userId, proficiencyLevel, languageId);
     }
 
     public FlashcardCollection CreateCollection(string name)
@@ -47,12 +46,7 @@ public class LanguageAccount : Entity
 
     public void UpdateProficiencyLevel(ProficiencyLevel newLevel)
     {
-        ArgumentNullException.ThrowIfNull(newLevel);
-
-        if (newLevel.Value < ProficiencyLevel.Value)
-        {
-            throw new InvalidOperationException("Cannot downgrade proficiency level.");
-        }
+        ArgumentNullException.ThrowIfNull(newLevel);      
 
         ProficiencyLevel = newLevel;
     }

@@ -3,6 +3,7 @@ using Domain.LanguageAccount;
 using Domain.LanguageAccount.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SharedKernel.SharedEntities.Language;
 
 namespace Infrastructure.LanguageAccount;
 
@@ -12,11 +13,11 @@ public class LanguageAccountConfiguration : IEntityTypeConfiguration<Domain.Lang
     {
         builder.HasKey(la => la.Id);
 
-        builder.Property(la => la.Language)
-            .HasConversion(
-                language => JsonSerializer.Serialize(language, (JsonSerializerOptions?)null),
-                json => JsonSerializer.Deserialize<Language>(json, (JsonSerializerOptions?)null)!)
-            .HasColumnType("nvarchar(100)");
+        builder.HasOne<Language>()
+            .WithMany()
+            .HasForeignKey(la => la.LanguageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
 
         builder.Property(la => la.ProficiencyLevel)
             .HasConversion(
