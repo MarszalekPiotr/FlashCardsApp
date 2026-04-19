@@ -12,7 +12,8 @@ namespace Application.LanguageAccounts.Commands.DeleteLanguageAccount;
 internal sealed class DeleteLanguageAccountCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
     IApplicationDbContext applicationDbContext,
-    CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification)
+    CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification,
+    IUserContext userContext)
     : ICommandHandler<DeleteLanguageAccountCommand>
 {
     public async Task<Result> Handle(DeleteLanguageAccountCommand command, CancellationToken cancellationToken)
@@ -25,7 +26,7 @@ internal sealed class DeleteLanguageAccountCommandHandler(
             return Result.Failure(LanguageAccountErrors.NotFound(command.LanguageAccountId));
         }
 
-        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(account.Id, account.UserId, cancellationToken);
+        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(account.Id, userContext.UserId, cancellationToken);
         if (!canAccess)
         {
             return Result.Failure(AuthorizationError.Forbidden());   

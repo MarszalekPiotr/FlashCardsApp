@@ -21,10 +21,8 @@ public class FlashcardReview : Entity
         ReviewResult = reviewResult;
     }
 
-    public static FlashcardReview Create(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult, IDateTimeProvider dateTimeProvider)
+    public static FlashcardReview Create(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult)
     {
-        if (reviewDate > dateTimeProvider.UtcNow)
-            throw new ArgumentException("Review date cannot be in the future.", nameof(reviewDate));
         var review = new FlashcardReview(flashcardId, reviewDate, reviewResult);
         return review;
     }

@@ -17,9 +17,9 @@ public class LanguageAccountRepository : BaseWriteRepository, ILanguageAccountRe
             .SingleOrDefaultAsync(la => la.Id == id, cancellationToken);
     }
 
-    public void Add(Domain.LanguageAccount.LanguageAccount account)
+    public async Task AddAsync(Domain.LanguageAccount.LanguageAccount account)
     {
-        _applicationDbContext.LanguageAccounts.Add(account);
+        await _applicationDbContext.LanguageAccounts.AddAsync(account);
     }
 
     public void Remove(Domain.LanguageAccount.LanguageAccount account)

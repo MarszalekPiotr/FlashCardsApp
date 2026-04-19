@@ -14,7 +14,8 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
     IApplicationDbContext applicationDbContext,
     CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<AddFlashcardToCollectionCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AddFlashcardToCollectionCommand command, CancellationToken cancellationToken)
@@ -41,8 +42,8 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
             command.SentenceWithBlanks,
             command.Translation,
             command.Answer,
-            synonyms);
-
+            synonyms,
+            dateTimeProvider.UtcNow);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         flashcard.Raise(new FlashcardCreatedDomainEvent(flashcard.Id));

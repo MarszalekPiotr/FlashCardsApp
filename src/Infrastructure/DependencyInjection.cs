@@ -9,7 +9,6 @@ using Infrastructure.Authorization;
 using Infrastructure.Database;
 using Infrastructure.DomainEvents;
 using Infrastructure.LanguageAccount;
-using Infrastructure.SRS;
 using Infrastructure.Time;
 using Infrastructure.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using SharedKernel;
 using Application.FlashcardCollection;
+using Infrastructure.FlashcardCollection;
 
 namespace Infrastructure;
 
@@ -68,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<IFlashcardCollectionReadRepository, FlashcardCollectionReadRepository>();
 
         services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
+
+        services.AddScoped<IFlashcardReviewRepository, FlashcardReviewRepository>();
 
         services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 

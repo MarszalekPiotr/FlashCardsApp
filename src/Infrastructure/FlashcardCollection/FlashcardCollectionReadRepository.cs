@@ -4,7 +4,7 @@ using Application.FlashcardCollection;
 using Application.FlashcardCollection.Queries;
 using Dapper;
 
-namespace Infrastructure.LanguageAccount;
+namespace Infrastructure.FlashcardCollection;
 
 public class FlashcardCollectionReadRepository : IFlashcardCollectionReadRepository
 {

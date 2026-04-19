@@ -4,6 +4,7 @@ using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
+
 namespace Application.Abstractions.Data;
 
 public interface IApplicationDbContext
@@ -15,6 +16,7 @@ public interface IApplicationDbContext
     DbSet<Flashcard> Flashcards { get; }
     DbSet<FlashcardReview> FlashcardReviews { get; }
     DbSet<SrsState> SrsStates { get; }
+    DbSet<OutboxMessage> OutboxMessages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

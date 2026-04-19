@@ -1,6 +1,7 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Authorization.FlashcardCollection;
 using Application.FlashcardCollection;
 using Domain.FlashcardCollection;
 using Domain.LanguageAccount.ValueObjects;
@@ -12,7 +13,8 @@ namespace Application.FlashcardCollection.Commands.UpdateFlashcard;
 internal sealed class UpdateFlashcardCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
     IApplicationDbContext applicationDbContext,
-    IUserContext userContext)
+    IUserContext userContext,
+    CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification)
     : ICommandHandler<UpdateFlashcardCommand>
 {
     public async Task<Result> Handle(UpdateFlashcardCommand command, CancellationToken cancellationToken)
@@ -32,10 +34,13 @@ internal sealed class UpdateFlashcardCommandHandler(
 
         var flashcard = collection.Flashcards.First();
 
-        if (collection.LanguageAccountId != userContext.UserId)
+        bool canAccess = await canAccessFlashcardCollectionSpecification.IsSatisfiedByAsync(collection.Id, userContext.UserId, cancellationToken);
+
+        if (!canAccess)
         {
-            return Result.Failure(UserErrors.Unauthorized());
+            return Result.Failure(AuthorizationError.Forbidden());
         }
+
 
         try
         {

@@ -38,7 +38,7 @@ internal sealed class CreateLanguageAccountCommandHandler(
             proficiencyLevel,
             language.Id);
 
-        languageAccountRepository.Add(account);
+        await languageAccountRepository.AddAsync(account);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         account.Raise(new LanguageAccountCreatedDomainEvent(account.Id));

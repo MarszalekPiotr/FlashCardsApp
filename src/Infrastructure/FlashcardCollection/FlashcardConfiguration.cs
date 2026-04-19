@@ -4,7 +4,7 @@ using Domain.LanguageAccount.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.LanguageAccount;
+namespace Infrastructure.FlashcardCollection;
 
 internal class FlashcardConfiguration : IEntityTypeConfiguration<Flashcard>
 {
@@ -35,9 +35,6 @@ internal class FlashcardConfiguration : IEntityTypeConfiguration<Flashcard>
             .HasForeignKey(f => f.FlashcardCollectionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(f => f.SrsState)
-            .WithOne()
-            .HasForeignKey<Flashcard>(f => f.Id)
-            .OnDelete(DeleteBehavior.Cascade);
+       
     }
 }

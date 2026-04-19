@@ -35,19 +35,13 @@ internal sealed class FlashcardReviewedDomainEventHandler(
 
         var srsState = flashcard.SrsState;
 
-        if (srsState is null)
-        {
-            srsState = SrsState.CreateInitialState(domainEvent.FlashcardId, dateTimeProvider);
-            flashcard.SetSrsState(srsState);
-
-        }
 
         var reviewResult = (ReviewResult)domainEvent.ReviewResult;
 
         /// dodac serwi domenowy do obliczania nowego stanu SRS na podstawie wyniku recenzji
         SrsStateCalculation newSrsState = srsCalculationService.CalculateNextState(srsState, reviewResult,dateTimeProvider.UtcNow );
 
-        srsState.UpdateState(newSrsState);
+        flashcard.UpdateSrsState(newSrsState);
 
         await applicationDbContext.SaveChangesAsync(cancellationToken);
     }

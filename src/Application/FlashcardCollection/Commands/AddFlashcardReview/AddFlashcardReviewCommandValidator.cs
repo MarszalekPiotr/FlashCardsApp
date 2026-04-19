@@ -7,6 +7,8 @@ internal sealed class AddFlashcardReviewCommandValidator : AbstractValidator<Add
 {
     public AddFlashcardReviewCommandValidator()
     {
+        RuleFor(c => c.FlaschardCollectionId).NotEmpty();
+
         RuleFor(c => c.FlashcardId).NotEmpty();
 
         RuleFor(c => c.ReviewResult)

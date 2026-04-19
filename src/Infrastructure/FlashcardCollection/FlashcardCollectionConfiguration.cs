@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Domain.LanguageAccount;
 
-namespace Infrastructure.LanguageAccount;
+namespace Infrastructure.FlashcardCollection;
 
-internal sealed class FlashcardCollectionConfiguration : IEntityTypeConfiguration<FlashcardCollection>
+internal sealed class FlashcardCollectionConfiguration : IEntityTypeConfiguration<Domain.FlashcardCollection.FlashcardCollection>
 {
-    public void Configure(EntityTypeBuilder<FlashcardCollection> builder)
+    public void Configure(EntityTypeBuilder<Domain.FlashcardCollection.FlashcardCollection> builder)
     {
         builder.HasKey(fc => fc.Id);
 

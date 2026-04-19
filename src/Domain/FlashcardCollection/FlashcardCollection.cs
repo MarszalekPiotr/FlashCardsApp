@@ -1,5 +1,4 @@
 using Domain.FlashcardCollection.Events;
-using Domain.LanguageAccount.Events;
 using SharedKernel;
 
 namespace Domain.FlashcardCollection;
@@ -29,7 +28,7 @@ public class FlashcardCollection : Entity
         return new FlashcardCollection(languageAccountId, name);
     }
 
-    public Flashcard AddFlashcard(string sentenceWithBlanks, string translation, string answer, Synonyms synonyms)
+    public Flashcard AddFlashcard(string sentenceWithBlanks, string translation, string answer, Synonyms synonyms,DateTime currentTime)
     {
         if (string.IsNullOrWhiteSpace(sentenceWithBlanks))
         {
@@ -48,7 +47,7 @@ public class FlashcardCollection : Entity
 
         ArgumentNullException.ThrowIfNull(synonyms);
 
-        var flashcard = new Flashcard(Id, sentenceWithBlanks, translation, answer, synonyms);
+        var flashcard = new Flashcard(Id, sentenceWithBlanks, translation, answer, synonyms, currentTime);
         _flashcards.Add(flashcard);
         return flashcard;
     }

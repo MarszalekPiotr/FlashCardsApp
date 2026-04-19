@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Domain.FlashcardCollection;
 
-namespace Infrastructure.SRS;
+namespace Infrastructure.FlashcardCollection;
 
 internal sealed class FlashcardReviewConfiguration : IEntityTypeConfiguration<FlashcardReview>
 {

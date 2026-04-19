@@ -15,7 +15,7 @@ public class SrsState : Entity
 
     private SrsState() { } // Required by EF Core
 
-    public SrsState(Guid flashcardId, int interval, double easeFactor, int repetitions, DateTime nextReviewDate)
+    private SrsState(Guid flashcardId, int interval, double easeFactor, int repetitions, DateTime nextReviewDate)
     {
         FlashcardId = flashcardId;
         Interval = interval;
@@ -24,14 +24,14 @@ public class SrsState : Entity
         NextReviewDate = nextReviewDate;
     }
 
-    public static SrsState CreateInitialState(Guid flashcardId, IDateTimeProvider dateTimeProvider)
+    public static SrsState CreateInitialState(Guid flashcardId, DateTime currentTime)
     {
         return new SrsState(
             flashcardId,
             interval: 0,
             easeFactor: 2.5,
             repetitions: 0,
-            nextReviewDate: dateTimeProvider.UtcNow);
+            nextReviewDate: currentTime);
     }
 
     public void UpdateState(SrsStateCalculation srsStateCalculation)

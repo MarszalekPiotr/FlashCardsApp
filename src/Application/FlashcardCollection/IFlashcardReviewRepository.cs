@@ -7,5 +7,5 @@ namespace Application.FlashcardCollection;
 
 public interface IFlashcardReviewRepository
 {
-    void Add(FlashcardReview review);
+    Task AddAsync(FlashcardReview review);
 }

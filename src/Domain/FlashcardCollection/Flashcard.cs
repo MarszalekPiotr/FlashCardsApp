@@ -1,4 +1,5 @@
-﻿using SharedKernel;
+﻿using Domain.FlashcardCollection.DomainServices;
+using SharedKernel;
 
 namespace Domain.FlashcardCollection;
 
@@ -17,13 +18,15 @@ public class Flashcard : Entity
 
     private Flashcard() { } // Required by EF Core
 
-    internal Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms)
+    internal Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
     {
         FlashcardCollectionId = flashcardCollectionId;
         SentenceWithBlanks = sentenceWithBlanks;
         Translation = translation;
         Answer = answer;
         Synonyms = synonyms;
+
+        SrsState = SrsState.CreateInitialState(Id,currentTime);
     }
 
     public void Update(string sentenceWithBlanks, string translation, string answer, Synonyms synonyms)
@@ -51,10 +54,10 @@ public class Flashcard : Entity
         Synonyms = synonyms;
     }
 
-    public void SetSrsState(SrsState srsState)
+    public void UpdateSrsState(SrsStateCalculation srsState)
     {   
         ArgumentNullException.ThrowIfNull(srsState);    
 
-        SrsState = srsState;
+       SrsState.UpdateState(srsState);
     }
 }

@@ -4,7 +4,7 @@ using Application.FlashcardCollection;
 using Domain.FlashcardCollection;
 using Microsoft.EntityFrameworkCore;
 
-namespace Infrastructure.LanguageAccount;
+namespace Infrastructure.FlashcardCollection;
 
 public class FlashcardCollectionRepository : BaseWriteRepository, IFlashcardCollectionRepository
 {
@@ -12,25 +12,25 @@ public class FlashcardCollectionRepository : BaseWriteRepository, IFlashcardColl
     {
     }
 
-    public void Add(FlashcardCollection collection)
+    public async Task AddAsync(Domain.FlashcardCollection.FlashcardCollection collection)
     {
-        _applicationDbContext.FlashcardCollections.Add(collection);
+        await _applicationDbContext.FlashcardCollections.AddAsync(collection);
     }
 
-    public async Task<FlashcardCollection?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Domain.FlashcardCollection.FlashcardCollection?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _applicationDbContext.FlashcardCollections
             .SingleOrDefaultAsync(fc => fc.Id == id, cancellationToken);
     }
 
-    public async Task<FlashcardCollection?> GetByIdWithSingleFlashcardAsync(Guid id, Guid flashcardId, CancellationToken cancellationToken)
+    public async Task<Domain.FlashcardCollection.FlashcardCollection?> GetByIdWithSingleFlashcardAsync(Guid id, Guid flashcardId, CancellationToken cancellationToken)
     {
         return await _applicationDbContext.FlashcardCollections
             .Include(fc => fc.Flashcards.Where(f => f.Id == flashcardId)).ThenInclude(f => f.SrsState)
             .SingleOrDefaultAsync(fc => fc.Id == id, cancellationToken);
     }
 
-    public void Remove(FlashcardCollection collection)
+    public void Remove(Domain.FlashcardCollection.FlashcardCollection collection)
     {
         _applicationDbContext.FlashcardCollections.Remove(collection);
     }

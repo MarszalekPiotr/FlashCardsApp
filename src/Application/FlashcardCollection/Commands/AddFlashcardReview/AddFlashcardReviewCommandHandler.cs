@@ -43,9 +43,9 @@ internal sealed class AddFlashcardReviewCommandHandler(
         }
 
         var reviewResult = (ReviewResult)command.ReviewResult;
-        var review = FlashcardReview.Create(command.FlashcardId, dateTimeProvider.UtcNow, reviewResult, dateTimeProvider);
+        var review = FlashcardReview.Create(command.FlashcardId, dateTimeProvider.UtcNow, reviewResult);
 
-        flashcardReviewRepository.Add(review);
+        await flashcardReviewRepository.AddAsync(review);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         review.Raise(new FlashcardReviewedDomainEvent(review.Id,command.FlaschardCollectionId, command.FlashcardId, review.ReviewDate, review.ReviewResult));
