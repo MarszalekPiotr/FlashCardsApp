@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<FlashcardReview> FlashcardReviews { get; }
     DbSet<SrsState> SrsStates { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
+    DbSet<OutboxMessageConsumer> OutboxMessageConsumers { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

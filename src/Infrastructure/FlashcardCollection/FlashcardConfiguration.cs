@@ -26,9 +26,9 @@ internal class FlashcardConfiguration : IEntityTypeConfiguration<Flashcard>
 
         builder.Property(f => f.Synonyms)
             .HasConversion(
-                synonyms => string.Join("|", synonyms.Value),
-                value => new Synonyms(value.Split('|', StringSplitOptions.RemoveEmptyEntries).ToList()))
-            .HasMaxLength(1000);
+                synonyms => JsonSerializer.Serialize(synonyms.Value, (JsonSerializerOptions?)null),
+                value => new Synonyms(JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null)!))
+            .HasColumnType("nvarchar(max)");
 
         builder.HasOne(f => f.FlashcardCollection)
             .WithMany(fc => fc.Flashcards)

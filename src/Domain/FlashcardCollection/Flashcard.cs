@@ -20,6 +20,7 @@ public class Flashcard : Entity
 
     internal Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
     {
+        Id = Guid.NewGuid();
         FlashcardCollectionId = flashcardCollectionId;
         SentenceWithBlanks = sentenceWithBlanks;
         Translation = translation;

@@ -27,7 +27,7 @@ internal sealed class AddFlashcardReviewCommandHandler(
 
         if (collection is null)
         {
-            return (Result<Guid>)Result.Failure(FlashcardCollectionErrors.NotFound(command.FlashcardId));
+            return (Result<Guid>)Result.Failure(FlashcardCollectionErrors.NotFound(command.FlaschardCollectionId));
         }
 
         if (collection.Flashcards == null || !collection.Flashcards.Any())
@@ -46,9 +46,10 @@ internal sealed class AddFlashcardReviewCommandHandler(
         var review = FlashcardReview.Create(command.FlashcardId, dateTimeProvider.UtcNow, reviewResult);
 
         await flashcardReviewRepository.AddAsync(review);
-        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         review.Raise(new FlashcardReviewedDomainEvent(review.Id,command.FlaschardCollectionId, command.FlashcardId, review.ReviewDate, review.ReviewResult));
+
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return review.Id;
     }

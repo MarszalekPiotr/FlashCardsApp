@@ -44,9 +44,9 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
             command.Answer,
             synonyms,
             dateTimeProvider.UtcNow);
-        await applicationDbContext.SaveChangesAsync(cancellationToken);
-
         flashcard.Raise(new FlashcardCreatedDomainEvent(flashcard.Id));
+
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return flashcard.Id;
     }

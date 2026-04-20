@@ -6,7 +6,7 @@ using Domain.FlashcardCollection.Events;
 using Application.FlashcardCollection;
 using Domain.FlashcardCollection.DomainServices;
 
-namespace Application.LanguageAccounts.Events;
+namespace Application.FlashcardCollection.Events;
 
 internal sealed class FlashcardReviewedDomainEventHandler(
     IFlashcardCollectionRepository flashcardCollectionWriteRepository,

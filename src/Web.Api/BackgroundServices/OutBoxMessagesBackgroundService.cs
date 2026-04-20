@@ -67,27 +67,40 @@ public class OutBoxMessagesBackgroundService : BackgroundService
                         continue;
                     }
 
+                    string handlerTypeName = handler.GetType().FullName!;
+
+                    bool alreadyProcessed = dbContext.OutboxMessageConsumers
+                        .Any(c => c.OutboxMessageId == outboxMessage.Id && c.HandlerType == handlerTypeName);
+
+                    if (alreadyProcessed)
+                    {
+                        continue;
+                    }
+
                     var handlerWrapper = HandlerWrapper.Create(handler, domainEventType);
 
                     try
                     {
                         await handlerWrapper.Handle(domainEvent, stoppingToken);
 
+                        dbContext.OutboxMessageConsumers.Add(new OutboxMessageConsumer
+                        {
+                            OutboxMessageId = outboxMessage.Id,
+                            HandlerType = handlerTypeName,
+                            ProcessedOnUtc = _dateTimeProvider.UtcNow
+                        });
                     }
                     catch (Exception ex)
-                    {   
+                    {
                         isSucceded = false;
                         outboxMessage.Error = $"Failed to process domain event of type {outboxMessage.Type}. Error: {ex.Message}";
-                        
+
                         continue;
-
                     }
-
                 }
                 if(isSucceded)
                 {
                     outboxMessage.ProcessedOnUtc = _dateTimeProvider.UtcNow;
-                    
                 }
                 else
                 {

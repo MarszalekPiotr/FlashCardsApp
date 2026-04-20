@@ -1,6 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
-using Application.Authorization.FlashcardCollection;
+using Application.Authorization.LanguageAccount;
 using Application.FlashcardCollection.Queries;
 using Domain.LanguageAccount;
 using Domain.Users;
@@ -11,33 +11,25 @@ namespace Application.FlashcardCollection.Queries.GetFlashcardCollections;
 internal sealed class GetFlashcardCollectionsQueryHandler(
     IFlashcardCollectionReadRepository readRepository,
     IUserContext userContext,
-    CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification)
+    CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification)
     : IQueryHandler<GetFlashcardCollectionsQuery, List<FlashcardCollectionResponse>>
 {
     public async Task<Result<List<FlashcardCollectionResponse>>> Handle(
         GetFlashcardCollectionsQuery query,
         CancellationToken cancellationToken)
     {
-        
+        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(
+            query.LanguageAccountId,
+            userContext.UserId,
+            cancellationToken);
 
-        List<FlashcardCollectionListReadModel> collections =
-            await readRepository.GetByLanguageAccountIdAsync(query.LanguageAccountId);
-
-        bool forbidden = false;
-        collections.ForEach(async collection => 
-        {
-            bool canAccess = await canAccessFlashcardCollectionSpecification.IsSatisfiedByAsync(collection.Id, userContext.UserId, cancellationToken);
-            if (!canAccess)
-            {
-                forbidden = true;
-            }
-        }
-        );
-
-        if (forbidden)
+        if (!canAccess)
         {
             return Result.Failure<List<FlashcardCollectionResponse>>(AuthorizationError.Forbidden());
         }
+
+        List<FlashcardCollectionListReadModel> collections =
+            await readRepository.GetByLanguageAccountIdAsync(query.LanguageAccountId);
 
         var response = collections
             .Select(c => new FlashcardCollectionResponse

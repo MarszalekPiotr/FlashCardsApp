@@ -41,9 +41,9 @@ internal sealed class CreateFlashcardCollectionCommandHandler(
 
         await flashcardCollectionRepository.AddAsync(collection);
 
-        await applicationDbContext.SaveChangesAsync(cancellationToken);
-
         collection.Raise(new FlashcardCollectionCreatedDomainEvent(collection.Id));
+
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return collection.Id;
     }

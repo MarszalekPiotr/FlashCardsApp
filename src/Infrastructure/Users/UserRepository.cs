@@ -14,11 +14,9 @@ public class UserWriteRepository : BaseWriteRepository, IUserWriteRepository
     {
     }
 
-    public async Task<Guid> AddAsync(User user)
+    public async Task AddAsync(User user)
     {
-        var userId = await _applicationDbContext.Users.AddAsync(user);
-        return userId.Entity.Id;
-
+        await _applicationDbContext.Users.AddAsync(user);
     }
 
     public async Task<User?> GetUserByEmail(string email, CancellationToken cancellationToken)

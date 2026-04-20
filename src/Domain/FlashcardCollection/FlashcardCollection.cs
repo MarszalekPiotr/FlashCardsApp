@@ -16,6 +16,7 @@ public class FlashcardCollection : Entity
 
     private FlashcardCollection(Guid languageAccountId, string name)
     {
+        Id = Guid.NewGuid();
         LanguageAccountId = languageAccountId;
         Name = name;
   

@@ -39,9 +39,10 @@ internal sealed class CreateLanguageAccountCommandHandler(
             language.Id);
 
         await languageAccountRepository.AddAsync(account);
-        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         account.Raise(new LanguageAccountCreatedDomainEvent(account.Id));
+
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return account.Id;
     }

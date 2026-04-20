@@ -31,9 +31,9 @@ internal sealed class RegisterUserCommandHandler(
 
              await userWriteRepository.AddAsync(user);
 
-            await applicationDbContext.SaveChangesAsync(cancellationToken);
-
             user.Raise(new UserRegisteredDomainEvent(user.Id));
+
+            await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return user.Id;
        
