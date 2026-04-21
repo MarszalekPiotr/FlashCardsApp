@@ -15,7 +15,7 @@ internal sealed class RegisterUserCommandHandler(
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
-        bool userExists = await userWriteRepository.UserExists(command.Email);
+        bool userExists = await userWriteRepository.UserExists(command.Email, cancellationToken);
         if (userExists)
         {
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);

@@ -3,51 +3,39 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Authorization.FlashcardCollection;
 using Domain.FlashcardCollection;
+using Domain.FlashcardCollection.DomainServices;
 using Domain.FlashcardCollection.Enums;
-using Domain.FlashcardCollection.Events;
-using Domain.Users;
 using SharedKernel;
 
 namespace Application.FlashcardCollection.Commands.AddFlashcardReview;
 
 internal sealed class AddFlashcardReviewCommandHandler(
-    IFlashcardReviewRepository flashcardReviewRepository,
+    IFlashcardRepository flashcardRepository,
     IApplicationDbContext applicationDbContext,
     IDateTimeProvider dateTimeProvider,
-    IFlashcardCollectionRepository flashcardCollectionRepository,
     IUserContext userContext,
+    SrsCalculationService srsCalculationService,
     CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification)
     : ICommandHandler<AddFlashcardReviewCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AddFlashcardReviewCommand command, CancellationToken cancellationToken)
     {
+        Flashcard? flashcard = await flashcardRepository.GetByIdAsync(command.FlashcardId, cancellationToken);
 
-
-        Domain.FlashcardCollection.FlashcardCollection collection = await flashcardCollectionRepository.GetByIdWithSingleFlashcardAsync(command.FlaschardCollectionId, command.FlashcardId, cancellationToken);
-
-        if (collection is null)
+        if (flashcard is null)
         {
-            return (Result<Guid>)Result.Failure(FlashcardCollectionErrors.NotFound(command.FlaschardCollectionId));
+            return Result.Failure<Guid>(FlashcardErrors.NotFound(command.FlashcardId));
         }
 
-        if (collection.Flashcards == null || !collection.Flashcards.Any())
-        {
-            return (Result<Guid>)Result.Failure(FlashcardErrors.NotFound(command.FlashcardId));
-        }
+        bool canAccess = await canAccessFlashcardCollectionSpecification.IsSatisfiedByAsync(flashcard.FlashcardCollectionId, userContext.UserId, cancellationToken);
 
-       bool canAccess = await canAccessFlashcardCollectionSpecification.IsSatisfiedByAsync(collection.Id, userContext.UserId, cancellationToken);  
-
-        if(!canAccess)
+        if (!canAccess)
         {
             return Result.Failure<Guid>(AuthorizationError.Forbidden());
         }
 
         var reviewResult = (ReviewResult)command.ReviewResult;
-        var review = FlashcardReview.Create(command.FlashcardId, dateTimeProvider.UtcNow, reviewResult);
-
-        await flashcardReviewRepository.AddAsync(review);
-
-        review.Raise(new FlashcardReviewedDomainEvent(review.Id,command.FlaschardCollectionId, command.FlashcardId, review.ReviewDate, review.ReviewResult));
+        FlashcardReview review = flashcard.AddReview(reviewResult, srsCalculationService, dateTimeProvider.UtcNow);
 
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 

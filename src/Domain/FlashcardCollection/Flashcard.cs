@@ -1,4 +1,6 @@
 ﻿using Domain.FlashcardCollection.DomainServices;
+using Domain.FlashcardCollection.Enums;
+using Domain.FlashcardCollection.Events;
 using SharedKernel;
 
 namespace Domain.FlashcardCollection;
@@ -7,7 +9,6 @@ public class Flashcard : Entity
 {
     public Guid Id { get; private set; }
     public Guid FlashcardCollectionId { get; private set; }
-    public FlashcardCollection? FlashcardCollection { get; private set; }
 
     public string SentenceWithBlanks { get; private set; }
     public string Translation { get; private set; }
@@ -16,9 +17,12 @@ public class Flashcard : Entity
 
     public SrsState SrsState { get; private set; }
 
+    private readonly List<FlashcardReview> _reviews = new();
+    public IReadOnlyCollection<FlashcardReview> Reviews => _reviews.AsReadOnly();
+
     private Flashcard() { } // Required by EF Core
 
-    internal Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
+    private Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
     {
         Id = Guid.NewGuid();
         FlashcardCollectionId = flashcardCollectionId;
@@ -27,7 +31,17 @@ public class Flashcard : Entity
         Answer = answer;
         Synonyms = synonyms;
 
-        SrsState = SrsState.CreateInitialState(Id,currentTime);
+        SrsState = SrsState.CreateInitialState(Id, currentTime);
+    }
+
+    public static Flashcard Create(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sentenceWithBlanks, nameof(sentenceWithBlanks));
+        ArgumentException.ThrowIfNullOrWhiteSpace(translation, nameof(translation));
+        ArgumentException.ThrowIfNullOrWhiteSpace(answer, nameof(answer));
+        ArgumentNullException.ThrowIfNull(synonyms);
+
+        return new Flashcard(flashcardCollectionId, sentenceWithBlanks, translation, answer, synonyms, currentTime);
     }
 
     public void Update(string sentenceWithBlanks, string translation, string answer, Synonyms synonyms)
@@ -55,10 +69,18 @@ public class Flashcard : Entity
         Synonyms = synonyms;
     }
 
-    public void UpdateSrsState(SrsStateCalculation srsState)
-    {   
-        ArgumentNullException.ThrowIfNull(srsState);    
+    public FlashcardReview AddReview(ReviewResult reviewResult, SrsCalculationService srsCalculationService, DateTime currentTime)
+    {
+        ArgumentNullException.ThrowIfNull(srsCalculationService);
 
-       SrsState.UpdateState(srsState);
+        var review = FlashcardReview.Create(Id, currentTime, reviewResult);
+        _reviews.Add(review);
+
+        SrsStateCalculation newSrsState = srsCalculationService.CalculateNextState(SrsState, reviewResult, currentTime);
+        SrsState.UpdateState(newSrsState);
+
+        Raise(new FlashcardReviewedDomainEvent(review.Id, FlashcardCollectionId, Id, review.ReviewDate, review.ReviewResult));
+
+        return review;
     }
 }

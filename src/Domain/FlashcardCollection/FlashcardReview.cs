@@ -22,7 +22,7 @@ public class FlashcardReview : Entity
         ReviewResult = reviewResult;
     }
 
-    public static FlashcardReview Create(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult)
+    internal static FlashcardReview Create(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult)
     {
         var review = new FlashcardReview(flashcardId, reviewDate, reviewResult);
         return review;

@@ -67,7 +67,7 @@ public static class DependencyInjection
 
         services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
 
-        services.AddScoped<IFlashcardReviewRepository, FlashcardReviewRepository>();
+        services.AddScoped<IFlashcardRepository, FlashcardRepository>();
 
         services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 

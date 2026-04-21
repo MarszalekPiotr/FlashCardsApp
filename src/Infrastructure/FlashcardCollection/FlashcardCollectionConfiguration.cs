@@ -20,13 +20,9 @@ internal sealed class FlashcardCollectionConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(fc => fc.LanguageAccountId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(fc => fc.Flashcards)
-            .WithOne(f => f.FlashcardCollection)
+        builder.HasMany<Flashcard>()
+            .WithOne()
             .HasForeignKey(f => f.FlashcardCollectionId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        builder.Navigation(fc => fc.Flashcards)
-            .HasField("_flashcards")
-            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

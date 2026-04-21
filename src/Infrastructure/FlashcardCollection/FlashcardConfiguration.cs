@@ -30,11 +30,13 @@ internal class FlashcardConfiguration : IEntityTypeConfiguration<Flashcard>
                 value => new Synonyms(JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null)!))
             .HasColumnType("nvarchar(max)");
 
-        builder.HasOne(f => f.FlashcardCollection)
-            .WithMany(fc => fc.Flashcards)
-            .HasForeignKey(f => f.FlashcardCollectionId)
+        builder.HasMany<FlashcardReview>()
+            .WithOne()
+            .HasForeignKey(r => r.FlashcardId)
             .OnDelete(DeleteBehavior.Cascade);
 
-       
+        builder.Navigation(f => f.Reviews)
+            .HasField("_reviews")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

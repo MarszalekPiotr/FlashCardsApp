@@ -5,13 +5,13 @@ using Application.Authorization.FlashcardCollection;
 using Domain.FlashcardCollection;
 using Domain.FlashcardCollection.Events;
 using Domain.LanguageAccount.ValueObjects;
-using Domain.Users;
 using SharedKernel;
 
 namespace Application.FlashcardCollection.Commands.AddFlashcardToCollection;
 
 internal sealed class AddFlashcardToCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
+    IFlashcardRepository flashcardRepository,
     IApplicationDbContext applicationDbContext,
     CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification,
     IUserContext userContext,
@@ -20,7 +20,7 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
 {
     public async Task<Result<Guid>> Handle(AddFlashcardToCollectionCommand command, CancellationToken cancellationToken)
     {
-       Domain.FlashcardCollection.FlashcardCollection? collection =
+        Domain.FlashcardCollection.FlashcardCollection? collection =
             await flashcardCollectionRepository.GetByIdAsync(command.FlashcardCollectionId, cancellationToken);
 
         if (collection is null)
@@ -33,18 +33,23 @@ internal sealed class AddFlashcardToCollectionCommandHandler(
             userContext.UserId,
             cancellationToken);
 
-        if (!canAccessCollection) {
+        if (!canAccessCollection)
+        {
             return Result.Failure<Guid>(AuthorizationError.Forbidden());
         }
 
         var synonyms = new Synonyms(command.Synonyms);
-        Flashcard flashcard = collection.AddFlashcard(
+        Flashcard flashcard = Flashcard.Create(
+            collection.Id,
             command.SentenceWithBlanks,
             command.Translation,
             command.Answer,
             synonyms,
             dateTimeProvider.UtcNow);
+
         flashcard.Raise(new FlashcardCreatedDomainEvent(flashcard.Id));
+
+        await flashcardRepository.AddAsync(flashcard);
 
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
