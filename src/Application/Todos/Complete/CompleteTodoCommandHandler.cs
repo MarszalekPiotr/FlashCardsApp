@@ -9,7 +9,7 @@ namespace Application.Todos.Complete;
 
 internal sealed class CompleteTodoCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider,
+    SharedKernel.IDateTimeProvider dateTimeProvider,
     IUserContext userContext)
     : ICommandHandler<CompleteTodoCommand>
 {

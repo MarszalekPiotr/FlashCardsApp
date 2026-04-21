@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.UpdateFlashcard;
+using Application.FlashcardCollection.Commands.UpdateFlashcard;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -27,6 +27,7 @@ internal sealed class Update : IEndpoint
                 CancellationToken cancellationToken) =>
             {
                 var command = new UpdateFlashcardCommand(
+                    collectionId,
                     flashcardId,
                     request.SentenceWithBlanks,
                     request.Translation,

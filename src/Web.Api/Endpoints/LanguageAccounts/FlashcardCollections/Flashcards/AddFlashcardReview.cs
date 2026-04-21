@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.AddFlashcardReview;
+using Application.FlashcardCollection.Commands.AddFlashcardReview;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -22,7 +22,7 @@ internal sealed class AddFlashcardReview : IEndpoint
                 ICommandHandler<AddFlashcardReviewCommand, Guid> handler,
                 CancellationToken cancellationToken) =>
             {
-                var command = new AddFlashcardReviewCommand(flashcardId, request.ReviewResult);
+                var command = new AddFlashcardReviewCommand(collectionId,flashcardId, request.ReviewResult);
 
                 Result<Guid> result = await handler.Handle(command, cancellationToken);
 

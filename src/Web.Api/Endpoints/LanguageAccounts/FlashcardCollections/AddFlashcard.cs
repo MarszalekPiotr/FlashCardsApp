@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.AddFlashcardToCollection;
+using Application.FlashcardCollection.Commands.AddFlashcardToCollection;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;

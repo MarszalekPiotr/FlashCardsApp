@@ -11,7 +11,7 @@ namespace Application.LanguageAccounts.Commands.UpdateProficiencyLevel;
 
 internal sealed class UpdateProficiencyLevelCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
     IUserContext userContext)
     : ICommandHandler<UpdateProficiencyLevelCommand>
 {
@@ -41,7 +41,7 @@ internal sealed class UpdateProficiencyLevelCommandHandler(
             return Result.Failure(Error.Problem("LanguageAccounts.ProficiencyDowngrade", ex.Message));
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

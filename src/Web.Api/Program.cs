@@ -18,6 +18,8 @@ builder.Services
     .AddPresentation()
     .AddInfrastructure(builder.Configuration);
 
+builder.Services.AddHostedService<Web.Api.BackgroundServices.OutBoxMessagesBackgroundService>();
+
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
 WebApplication app = builder.Build();
