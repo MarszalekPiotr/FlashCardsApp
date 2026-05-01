@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
+using Application.Authorization.LanguageAccount;
 using Application.LanguageAccounts.DTO;
 using Domain.LanguageAccount;
 using Domain.Users;
@@ -9,7 +10,8 @@ namespace Application.LanguageAccounts.Queries.GetLanguageAccountById;
 
 internal sealed class GetLanguageAccountByIdQueryHandler(
     ILanguageAccountReadRepository readRepository,
-    IUserContext userContext)
+    IUserContext userContext,
+    CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification)
     : IQueryHandler<GetLanguageAccountByIdQuery, LanguageAccountDetailResponse>
 {
     public async Task<Result<LanguageAccountDetailResponse>> Handle(
@@ -25,9 +27,11 @@ internal sealed class GetLanguageAccountByIdQueryHandler(
                 LanguageAccountErrors.NotFound(query.LanguageAccountId));
         }
 
-        if (account.UserId != userContext.UserId)
+       bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(account.Id, userContext.UserId, cancellationToken);
+
+        if (!canAccess)
         {
-            return Result.Failure<LanguageAccountDetailResponse>(UserErrors.Unauthorized());
+             return Result.Failure<LanguageAccountDetailResponse>(AuthorizationError.Forbidden());
         }
 
         var response = new LanguageAccountDetailResponse

@@ -22,4 +22,8 @@
 	<InternalsVisibleTo Include="ArchitectureTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="SRS\" />
+  </ItemGroup>
+
 </Project>

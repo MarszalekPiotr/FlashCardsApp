@@ -10,7 +10,7 @@ namespace Application.Todos.Copy;
 
 internal sealed class CopyTodoCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider,
+    SharedKernel.IDateTimeProvider dateTimeProvider,
     IUserContext userContext)
     : ICommandHandler<CopyTodoCommand, Guid>
 {

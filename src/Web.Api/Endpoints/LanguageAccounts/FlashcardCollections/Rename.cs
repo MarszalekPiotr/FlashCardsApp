@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.RenameFlashcardCollection;
+using Application.FlashcardCollection.Commands.RenameFlashcardCollection;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;

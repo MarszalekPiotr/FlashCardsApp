@@ -10,7 +10,7 @@ namespace Application.Todos.Create;
 
 internal sealed class CreateTodoCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider,
+    SharedKernel.IDateTimeProvider dateTimeProvider,
     IUserContext userContext)
     : ICommandHandler<CreateTodoCommand, Guid>
 {

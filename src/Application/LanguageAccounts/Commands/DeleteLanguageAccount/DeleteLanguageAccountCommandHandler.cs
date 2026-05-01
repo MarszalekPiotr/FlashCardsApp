@@ -1,6 +1,7 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Authorization.LanguageAccount;
 using Application.LanguageAccounts;
 using Domain.LanguageAccount;
 using Domain.Users;
@@ -10,7 +11,8 @@ namespace Application.LanguageAccounts.Commands.DeleteLanguageAccount;
 
 internal sealed class DeleteLanguageAccountCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
-    IUnitOfWork unitOfWork,
+    IApplicationDbContext applicationDbContext,
+    CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification,
     IUserContext userContext)
     : ICommandHandler<DeleteLanguageAccountCommand>
 {
@@ -24,14 +26,16 @@ internal sealed class DeleteLanguageAccountCommandHandler(
             return Result.Failure(LanguageAccountErrors.NotFound(command.LanguageAccountId));
         }
 
-        if (account.UserId != userContext.UserId)
+        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(account.Id, userContext.UserId, cancellationToken);
+        if (!canAccess)
         {
-            return Result.Failure(UserErrors.Unauthorized());
+            return Result.Failure(AuthorizationError.Forbidden());   
         }
 
         languageAccountRepository.Remove(account);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }
 }
+

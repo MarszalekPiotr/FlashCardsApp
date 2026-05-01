@@ -1,5 +1,8 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Authorization.FlashcardCollection;
+using Application.Authorization.LanguageAccount;
+using Domain.FlashcardCollection.DomainServices;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel;
@@ -34,6 +37,10 @@ public static class DependencyInjection
             .WithScopedLifetime());
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+
+        services.AddScoped<CanAccessFlashcardCollectionSpecification>();
+        services.AddScoped<CanAccessLanguageAccountSpecification>();
+        services.AddSingleton<SrsCalculationService>();
 
         return services;
     }

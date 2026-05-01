@@ -10,12 +10,12 @@ namespace Application.Users.Register;
 internal sealed class RegisterUserCommandHandler(
     IPasswordHasher passwordHasher,
     IUserWriteRepository userWriteRepository,
-    IUnitOfWork unitOfWork)
+    IApplicationDbContext applicationDbContext)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
-        bool userExists = await userWriteRepository.UserExists(command.Email);
+        bool userExists = await userWriteRepository.UserExists(command.Email, cancellationToken);
         if (userExists)
         {
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
@@ -29,11 +29,13 @@ internal sealed class RegisterUserCommandHandler(
               command.LastName,
               hashedPassword);
 
-            Guid userId = await userWriteRepository.AddAsync(user);
+             await userWriteRepository.AddAsync(user);
 
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            user.Raise(new UserRegisteredDomainEvent(user.Id));
 
-            return userId;
+            await applicationDbContext.SaveChangesAsync(cancellationToken);
+
+        return user.Id;
        
     }
 }

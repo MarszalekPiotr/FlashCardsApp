@@ -8,10 +8,7 @@ internal sealed class CreateLanguageAccountCommandValidator : AbstractValidator<
 {
     public CreateLanguageAccountCommandValidator()
     {
-        RuleFor(c => c.LanguageCode)
-            .NotEmpty()
-            .Must(code => Language.GetSupportedLanguages().Any(l => l.Code == code))
-            .WithMessage("Language code is not supported.");
+      
 
     }
 }

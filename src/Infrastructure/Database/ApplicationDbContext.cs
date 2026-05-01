@@ -1,6 +1,7 @@
-﻿using Application.Abstractions.Data;
-using Domain.LanguageAccount;
-using Domain.SRS;
+﻿using System.Text.Json;
+using Application;
+using Application.Abstractions.Data;
+using Domain.FlashcardCollection;
 using Domain.Todos;
 using Domain.Users;
 using Infrastructure.DomainEvents;
@@ -12,7 +13,7 @@ namespace Infrastructure.Database;
 
 public sealed class ApplicationDbContext(
     DbContextOptions<ApplicationDbContext> options,
-    IDomainEventsDispatcher domainEventsDispatcher)
+    IDateTimeProvider dateTimeProvider)
     : DbContext(options), IApplicationDbContext
 {
     public DbSet<User> Users { get; set; }
@@ -21,13 +22,17 @@ public sealed class ApplicationDbContext(
 
     public DbSet<Domain.LanguageAccount.LanguageAccount> LanguageAccounts { get; set; }
 
-    public DbSet<FlashcardCollection> FlashcardCollections { get; set; }
+    public DbSet<Domain.FlashcardCollection.FlashcardCollection> FlashcardCollections { get; set; }
 
     public DbSet<Flashcard> Flashcards { get; set; }
 
-    public DbSet<Domain.SRS.SrsState> SrsStates { get; set; }
+    public DbSet<SrsState> SrsStates { get; set; }
 
-    public DbSet<Domain.SRS.FlashcardReview> FlashcardReviews { get; set; }
+    public DbSet<FlashcardReview> FlashcardReviews { get; set; }
+
+    public DbSet<OutboxMessage> OutboxMessages {  get; set; }
+
+    public DbSet<OutboxMessageConsumer> OutboxMessageConsumers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -49,7 +54,7 @@ public sealed class ApplicationDbContext(
         //     - handlers can fail
 
 
-        await PublishDomainEventsAsync();
+        await PublishDomainEventsAsync(cancellationToken);
         int result = await base.SaveChangesAsync(cancellationToken);
         return result;
     }
@@ -76,21 +81,38 @@ public sealed class ApplicationDbContext(
         }
     }
 
-    private async Task PublishDomainEventsAsync()
+    private async Task PublishDomainEventsAsync(CancellationToken cancellationToken = default)
     {
-        var domainEvents = ChangeTracker
-            .Entries<Entity>()
-            .Select(entry => entry.Entity)
-            .SelectMany(entity =>
-            {
-                List<IDomainEvent> domainEvents = entity.DomainEvents;
+        //var domainEvents = ChangeTracker
+        //    .Entries<Entity>()
+        //    .Select(entry => entry.Entity)
+        //    .SelectMany(entity =>
+        //    {
+        //        List<IDomainEvent> domainEvents = entity.DomainEvents;
 
-                entity.ClearDomainEvents();
+        //        entity.ClearDomainEvents();
 
-                return domainEvents;
-            })
-            .ToList();
+        //        return domainEvents;
+        //    })
+        //    .ToList();
 
-        await domainEventsDispatcher.DispatchAsync(domainEvents);
+        //await domainEventsDispatcher.DispatchAsync(domainEvents);
+
+        var outboxMessages = ChangeTracker
+       .Entries<Entity>()
+       .SelectMany(e => e.Entity.DomainEvents)
+       .Select(domainEvent => new OutboxMessage
+       {
+           Id = Guid.NewGuid(),
+           Type = $"{domainEvent.GetType().FullName}, {domainEvent.GetType().Assembly.GetName().Name}",
+           Content = JsonSerializer.Serialize(domainEvent),
+           OccurredOnUtc = dateTimeProvider.UtcNow
+       })
+       .ToList();
+
+        await OutboxMessages.AddRangeAsync(outboxMessages, cancellationToken);
+        ChangeTracker.Entries<Entity>().ToList().ForEach(e => e.Entity.ClearDomainEvents());
+
+
     }
 }

@@ -3,7 +3,6 @@ using Application.Users;
 using Application.Users.DTO;
 using Dapper;
 using Domain.Users;
-using Microsoft.Identity.Client;
 
 namespace Infrastructure.Users;
 
@@ -39,12 +38,26 @@ public class UserReadRepository : IUserReadRepository
             FROM Users
             WHERE Id = @UserId";
 
-
         IEnumerable<UserReadModel> users = await _dbConnection.QueryAsync<UserReadModel>(
             sql,
             new { UserId = userId }
         );
 
         return users.FirstOrDefault();
+    }
+
+    public async Task<UserAuthReadModel?> GetByEmailForAuthAsync(string email, CancellationToken cancellationToken)
+    {
+        string sql = @"
+            SELECT TOP 1 Id, Email, PasswordHash
+            FROM Users
+            WHERE Email = @Email";
+
+        IEnumerable<UserAuthReadModel> results = await _dbConnection.QueryAsync<UserAuthReadModel>(
+            sql,
+            new { Email = email }
+        );
+
+        return results.FirstOrDefault();
     }
 }

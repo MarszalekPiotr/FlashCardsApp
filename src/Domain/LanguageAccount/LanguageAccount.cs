@@ -11,48 +11,28 @@ public class LanguageAccount : Entity
     public Guid UserId { get; private set; }
     public User? User { get; private set; }
     public ProficiencyLevel ProficiencyLevel { get; private set; }
-    public Language Language { get; private set; }
-
-    private readonly List<FlashcardCollection> _flashcardCollections = new();
-    public IReadOnlyCollection<FlashcardCollection> FlashcardCollections => _flashcardCollections.AsReadOnly();
+    public Guid LanguageId { get; private set; }
 
     private LanguageAccount() { } // Required by EF Core
 
-    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Language language)
+    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
     {
+        Id = Guid.NewGuid();
         UserId = userId;
         ProficiencyLevel = proficiencyLevel;
-        Language = language;
-        Raise(new LanguageAccountCreatedDomainEvent(Id));
+        LanguageId = languageId;
+
     }
 
-    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Language language)
+    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
     {
-        ArgumentNullException.ThrowIfNull(proficiencyLevel);
-        ArgumentNullException.ThrowIfNull(language);      
-        return new LanguageAccount(userId, proficiencyLevel, language);
-    }
-
-    public FlashcardCollection CreateCollection(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Name cannot be null or whitespace.", nameof(name));
-        }
-
-        var collection = FlashcardCollection.Create(Id, name);
-        _flashcardCollections.Add(collection);
-        return collection;
+        ArgumentNullException.ThrowIfNull(proficiencyLevel);    
+        return new LanguageAccount(userId, proficiencyLevel, languageId);
     }
 
     public void UpdateProficiencyLevel(ProficiencyLevel newLevel)
     {
-        ArgumentNullException.ThrowIfNull(newLevel);
-
-        if (newLevel.Value < ProficiencyLevel.Value)
-        {
-            throw new InvalidOperationException("Cannot downgrade proficiency level.");
-        }
+        ArgumentNullException.ThrowIfNull(newLevel);      
 
         ProficiencyLevel = newLevel;
     }

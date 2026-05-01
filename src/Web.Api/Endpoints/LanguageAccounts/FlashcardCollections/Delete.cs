@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Application.LanguageAccounts.Commands.DeleteFlashcardCollection;
+using Application.FlashcardCollection.Commands.DeleteFlashcardCollection;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
