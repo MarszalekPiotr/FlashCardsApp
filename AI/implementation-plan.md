@@ -34,6 +34,7 @@ Every point contains:
 | 9 | Integration Tests — Full Happy Path | 🟢 Medium-term | Large |
 | 10 | Replace Guid.NewGuid() with Guid.CreateVersion7() | 🔵 Optional | Small |
 | 11 | SRS Magic Numbers to Named Constants | 🔵 Optional | Small |
+| 12 | Soft Delete Pattern (ISoftDeletable) | 🟡 Important | Medium |
 
 ---
 
@@ -1603,6 +1604,103 @@ public sealed class SrsCalculationService
 
 ---
 
+## Point 12 — Soft Delete Pattern (ISoftDeletable)
+
+### Why
+`DeleteLanguageAccountCommandHandler` calls `Remove()` which physically deletes the record and all cascade-linked data (FlashcardCollections, Flashcards, SrsStates, FlashcardReviews). This destroys historical review data permanently, breaks audit trails, and makes accidental deletions unrecoverable.
+
+**Scope decision:** Soft delete is applied **only to aggregate roots where deletion is a user-facing action** — NOT to child entities (their lifecycle is governed by the aggregate root):
+
+| Entity | Soft Delete | Reason |
+|--------|-------------|--------|
+| `User` | ✅ Yes | Account management, recovery, GDPR audit |
+| `LanguageAccount` | ✅ Yes | Explicitly called out in `cr` — cascade risk |
+| `FlashcardCollection` | ✅ Yes | User-facing deletion, contains valuable history |
+| `Flashcard` | ❌ No | Child of `FlashcardCollection` — governed by aggregate |
+| `FlashcardReview` | ❌ No | Immutable historical record — never delete |
+| `SrsState` | ❌ No | 1-to-1 with `Flashcard` — no independent lifecycle |
+
+### Where
+1. `src/SharedKernel/ISoftDeletable.cs` — **new file**
+2. `src/Domain/Users/User.cs` — implement `ISoftDeletable`, add `Delete()` method
+3. `src/Domain/LanguageAccount/LanguageAccount.cs` — implement `ISoftDeletable`, add `Delete()` method
+4. `src/Domain/FlashcardCollection/FlashcardCollection.cs` — implement `ISoftDeletable`, add `Delete()` method
+5. `src/Infrastructure/Database/ApplicationDbContext.cs` — global query filter + intercept hard deletes in `SaveChangesAsync`
+6. `src/Application/LanguageAccounts/Commands/DeleteLanguageAccount/DeleteLanguageAccountCommandHandler.cs` — replace `Remove()` with `entity.Delete()`
+7. Migration: `AddSoftDeleteFields`
+
+### How
+
+**Step 1 — Create `ISoftDeletable` interface:**
+```csharp
+// src/SharedKernel/ISoftDeletable.cs
+namespace SharedKernel;
+
+public interface ISoftDeletable
+{
+    bool IsDeleted { get; }
+    DateTime? DeletedAt { get; }
+    void Delete(DateTime utcNow);
+}
+```
+
+**Step 2 — Implement on `User`:**
+```csharp
+// Add to User.cs
+public bool IsDeleted { get; private set; }
+public DateTime? DeletedAt { get; private set; }
+
+public void Delete(DateTime utcNow)
+{
+    IsDeleted = true;
+    DeletedAt = utcNow;
+}
+```
+Apply same pattern to `LanguageAccount` and `FlashcardCollection`.
+
+**Step 3 — Global query filter + intercept in `ApplicationDbContext`:**
+```csharp
+// In OnModelCreating — apply filter to all ISoftDeletable entities
+foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+{
+    if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+    {
+        var parameter = Expression.Parameter(entityType.ClrType, "e");
+        var property = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+        var filter = Expression.Lambda(Expression.Not(property), parameter);
+        entityType.SetQueryFilter(filter);
+    }
+}
+
+// In SaveChangesAsync — convert hard deletes to soft deletes
+foreach (var entry in ChangeTracker.Entries<ISoftDeletable>()
+    .Where(e => e.State == EntityState.Deleted))
+{
+    entry.State = EntityState.Modified;
+    entry.Entity.Delete(dateTimeProvider.UtcNow);
+}
+```
+
+**Step 4 — Update `DeleteLanguageAccountCommandHandler`:**
+```csharp
+// Before (hard delete)
+languageAccountRepository.Remove(languageAccount);
+
+// After (soft delete — Remove() now triggers the interceptor automatically,
+// OR call Delete() explicitly and keep the entity in Modified state)
+languageAccount.Delete(dateTimeProvider.UtcNow);
+```
+
+> ⚠️ If you use the `SaveChangesAsync` interceptor approach, calling `Remove()` will automatically be converted — no handler change needed. But explicit `entity.Delete()` is cleaner and more readable.
+
+### Verification
+- `GET /language-accounts/{id}` returns 404 after delete (filtered by global query filter)
+- Record still exists in DB with `IsDeleted = true`, `DeletedAt` set
+- `FlashcardCollections` linked to deleted `LanguageAccount` are still physically intact
+- No cascade physical delete occurs
+
+---
+
 ## Summary Checklist
 
 Use this as a quick status tracker:
@@ -1620,3 +1718,4 @@ Use this as a quick status tracker:
 | 9 | Integration Tests | ☐ |
 | 10 | Replace Guid.NewGuid() with Guid.CreateVersion7() | ☐ |
 | 11 | SRS Magic Numbers to Named Constants | ☐ |
+| 12 | Soft Delete Pattern (ISoftDeletable) | ☐ |
