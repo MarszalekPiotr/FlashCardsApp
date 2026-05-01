@@ -2,7 +2,6 @@
 using Application;
 using Application.Abstractions.Data;
 using Domain.FlashcardCollection;
-using Domain.Todos;
 using Domain.Users;
 using Infrastructure.DomainEvents;
 using Microsoft.EntityFrameworkCore;
@@ -17,8 +16,6 @@ public sealed class ApplicationDbContext(
     : DbContext(options), IApplicationDbContext
 {
     public DbSet<User> Users { get; set; }
-
-    public DbSet<TodoItem> TodoItems { get; set; }
 
     public DbSet<Domain.LanguageAccount.LanguageAccount> LanguageAccounts { get; set; }
 
@@ -53,6 +50,14 @@ public sealed class ApplicationDbContext(
         //     - eventual consistency
         //     - handlers can fail
 
+        // Auto-stamp UpdatedAt for every modified entity
+        foreach (var entry in ChangeTracker.Entries<Entity>())
+        {
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.SetUpdatedAt(dateTimeProvider.UtcNow);
+            }
+        }
 
         await PublishDomainEventsAsync(cancellationToken);
         int result = await base.SaveChangesAsync(cancellationToken);
