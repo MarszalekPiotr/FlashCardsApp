@@ -21,10 +21,16 @@ internal sealed class RegisterUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
+        Result<Email> emailResult = Email.Create(command.Email);
+        if (emailResult.IsFailure)
+        {
+            return Result.Failure<Guid>(emailResult.Error);
+        }
+
         string hashedPassword = passwordHasher.Hash(command.Password);
 
         var user = User.Create(
-            new Email(command.Email),
+            emailResult.Value,
             command.FirstName,
             command.LastName,
             hashedPassword);

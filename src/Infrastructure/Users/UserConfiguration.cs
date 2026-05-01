@@ -14,7 +14,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email)
             .HasConversion(
                 email => email.Value,
-                value => new Email(value))
+                value => Email.FromPersistence(value))
             .HasMaxLength(255);
 
         builder.HasIndex(u => u.Email).IsUnique();
