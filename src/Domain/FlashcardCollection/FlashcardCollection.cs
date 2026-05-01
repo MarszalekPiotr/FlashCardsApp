@@ -13,7 +13,7 @@ public class FlashcardCollection : Entity
 
     private FlashcardCollection(Guid languageAccountId, string name)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         LanguageAccountId = languageAccountId;
         Name = name;
 

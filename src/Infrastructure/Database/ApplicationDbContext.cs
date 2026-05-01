@@ -108,7 +108,7 @@ public sealed class ApplicationDbContext(
        .SelectMany(e => e.Entity.DomainEvents)
        .Select(domainEvent => new OutboxMessage
        {
-           Id = Guid.NewGuid(),
+           Id = Guid.CreateVersion7(),
            Type = $"{domainEvent.GetType().FullName}, {domainEvent.GetType().Assembly.GetName().Name}",
            Content = JsonSerializer.Serialize(domainEvent),
            OccurredOnUtc = dateTimeProvider.UtcNow

@@ -16,7 +16,7 @@ public class FlashcardReview : Entity
 
     private FlashcardReview(Guid flashcardId, DateTime reviewDate, ReviewResult reviewResult)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         FlashcardId = flashcardId;
         ReviewDate = reviewDate;
         ReviewResult = reviewResult;

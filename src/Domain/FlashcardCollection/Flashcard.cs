@@ -24,7 +24,7 @@ public class Flashcard : Entity
 
     private Flashcard(Guid flashcardCollectionId, string sentenceWithBlanks, string translation, string answer, Synonyms synonyms, DateTime currentTime)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         FlashcardCollectionId = flashcardCollectionId;
         SentenceWithBlanks = sentenceWithBlanks;
         Translation = translation;
