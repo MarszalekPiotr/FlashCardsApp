@@ -5,7 +5,6 @@ using Application.Authorization.FlashcardCollection;
 using Application.Authorization.LanguageAccount;
 using Application.LanguageAccounts;
 using Domain.FlashcardCollection;
-using Domain.FlashcardCollection.Events;
 using Domain.LanguageAccount;
 using Domain.Users;
 using SharedKernel;
@@ -24,25 +23,23 @@ internal sealed class CreateFlashcardCollectionCommandHandler(
     {
         Domain.LanguageAccount.LanguageAccount? languageAccount =
             await languageAccountRepository.GetByIdAsync(command.LanguageAccountId, cancellationToken);
-        
+
         if (languageAccount is null)
         {
             return Result.Failure<Guid>(LanguageAccountErrors.NotFound(command.LanguageAccountId));
         }
 
-        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(command.LanguageAccountId ,userContext.UserId, cancellationToken);
+        bool canAccess = await canAccessLanguageAccountSpecification.IsSatisfiedByAsync(command.LanguageAccountId, userContext.UserId, cancellationToken);
         if (!canAccess)
         {
             return Result.Failure<Guid>(AuthorizationError.Forbidden());
         }
 
-
         Domain.FlashcardCollection.FlashcardCollection collection = Domain.FlashcardCollection.FlashcardCollection.Create(languageAccount.Id, command.Name);
 
         await flashcardCollectionRepository.AddAsync(collection);
 
-        collection.Raise(new FlashcardCollectionCreatedDomainEvent(collection.Id));
-
+        // FlashcardCollectionCreatedDomainEvent is raised inside FlashcardCollection.Create() — no manual Raise() needed here.
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return collection.Id;

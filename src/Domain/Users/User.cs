@@ -19,6 +19,9 @@ public sealed class User : Entity
         LastName = lastName;
         PasswordHash = passwordHash;
 
+        // Domain guarantees: a UserRegisteredDomainEvent is always raised when a User is created,
+        // regardless of which handler or service calls User.Create().
+        Raise(new UserRegisteredDomainEvent(Id));
     }
 
     public static User Create(Email email, string firstName, string lastName, string passwordHash)

@@ -21,21 +21,19 @@ internal sealed class RegisterUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
-          string hashedPassword = passwordHasher.Hash(command.Password);
+        string hashedPassword = passwordHasher.Hash(command.Password);
 
-          var user = User.Create(
-              new Email(command.Email),
-              command.FirstName,
-              command.LastName,
-              hashedPassword);
+        var user = User.Create(
+            new Email(command.Email),
+            command.FirstName,
+            command.LastName,
+            hashedPassword);
 
-             await userWriteRepository.AddAsync(user);
+        await userWriteRepository.AddAsync(user);
 
-            user.Raise(new UserRegisteredDomainEvent(user.Id));
-
-            await applicationDbContext.SaveChangesAsync(cancellationToken);
+        // UserRegisteredDomainEvent is raised inside User.Create() — no manual Raise() needed here.
+        await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return user.Id;
-       
     }
 }
