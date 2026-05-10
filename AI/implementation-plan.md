@@ -1607,27 +1607,80 @@ public sealed class SrsCalculationService
 ## Point 12 — Soft Delete Pattern (ISoftDeletable)
 
 ### Why
-`DeleteLanguageAccountCommandHandler` calls `Remove()` which physically deletes the record and all cascade-linked data (FlashcardCollections, Flashcards, SrsStates, FlashcardReviews). This destroys historical review data permanently, breaks audit trails, and makes accidental deletions unrecoverable.
+Three delete handlers call `Remove()` which physically deletes records and all cascade-linked data. This destroys historical review data permanently, breaks audit trails, and makes accidental deletions unrecoverable.
 
 **Scope decision:** Soft delete is applied **only to aggregate roots where deletion is a user-facing action** — NOT to child entities (their lifecycle is governed by the aggregate root):
 
 | Entity | Soft Delete | Reason |
 |--------|-------------|--------|
 | `User` | ✅ Yes | Account management, recovery, GDPR audit |
-| `LanguageAccount` | ✅ Yes | Explicitly called out in `cr` — cascade risk |
+| `LanguageAccount` | ✅ Yes | Cascade risk — owns FlashcardCollections |
 | `FlashcardCollection` | ✅ Yes | User-facing deletion, contains valuable history |
 | `Flashcard` | ❌ No | Child of `FlashcardCollection` — governed by aggregate |
 | `FlashcardReview` | ❌ No | Immutable historical record — never delete |
 | `SrsState` | ❌ No | 1-to-1 with `Flashcard` — no independent lifecycle |
 
-### Where
-1. `src/SharedKernel/ISoftDeletable.cs` — **new file**
-2. `src/Domain/Users/User.cs` — implement `ISoftDeletable`, add `Delete()` method
-3. `src/Domain/LanguageAccount/LanguageAccount.cs` — implement `ISoftDeletable`, add `Delete()` method
-4. `src/Domain/FlashcardCollection/FlashcardCollection.cs` — implement `ISoftDeletable`, add `Delete()` method
-5. `src/Infrastructure/Database/ApplicationDbContext.cs` — global query filter + intercept hard deletes in `SaveChangesAsync`
-6. `src/Application/LanguageAccounts/Commands/DeleteLanguageAccount/DeleteLanguageAccountCommandHandler.cs` — replace `Remove()` with `entity.Delete()`
-7. Migration: `AddSoftDeleteFields`
+---
+
+### Complete File Inventory
+
+#### Files to Create
+| File | Change |
+|------|--------|
+| `src/SharedKernel/ISoftDeletable.cs` | New interface |
+
+#### Domain — Add `IsDeleted`, `DeletedAt`, `Delete()` to each
+| File | Change |
+|------|--------|
+| `src/Domain/Users/User.cs` | Implement `ISoftDeletable` |
+| `src/Domain/LanguageAccount/LanguageAccount.cs` | Implement `ISoftDeletable` |
+| `src/Domain/FlashcardCollection/FlashcardCollection.cs` | Implement `ISoftDeletable` |
+
+#### Infrastructure — EF Core global query filter + hard-delete interceptor
+| File | Change |
+|------|--------|
+| `src/Infrastructure/Database/ApplicationDbContext.cs` | `OnModelCreating` + `SaveChangesAsync` |
+
+#### Command Handlers — Replace `Remove()` with `entity.Delete()`
+| File | Current Call | Fix |
+|------|-------------|-----|
+| `src/Application/LanguageAccounts/Commands/DeleteLanguageAccount/DeleteLanguageAccountCommandHandler.cs` | `languageAccountRepository.Remove(account)` | `account.Delete(dateTimeProvider.UtcNow)` |
+| `src/Application/FlashcardCollection/Commands/DeleteFlashcardCollection/DeleteFlashcardCollectionCommandHandler.cs` | `flashcardCollectionRepository.Remove(collection)` | `collection.Delete(dateTimeProvider.UtcNow)` |
+
+> ℹ️ `DeleteFlashcardCommandHandler` calls `flashcardRepository.Remove(flashcard)` — **no change needed** because `Flashcard` is NOT soft-deleted (it is a child governed by the collection).
+
+#### Dapper Read Repositories — Add `IsDeleted = 0` filters to SQL
+The EF Core global query filter only applies to EF Core queries. Every Dapper query that touches a soft-deletable table must be updated manually:
+
+| File | Method | Tables needing `AND x.IsDeleted = 0` |
+|------|--------|--------------------------------------|
+| `src/Infrastructure/Users/UserReadRepository.cs` | `GetByEmailAsync` | `Users` |
+| `src/Infrastructure/Users/UserReadRepository.cs` | `GetById` | `Users` |
+| `src/Infrastructure/Users/UserReadRepository.cs` | `GetByEmailForAuthAsync` | `Users` |
+| `src/Infrastructure/LanguageAccount/LanguageAccountReadRepository.cs` | `GetByUserIdAsync` | `LanguageAccounts` |
+| `src/Infrastructure/LanguageAccount/LanguageAccountReadRepository.cs` | `GetByIdAsync` | `LanguageAccounts` |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionReadRepository.cs` | `GetLanguageAccountUserIdAsync` | `LanguageAccounts` |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionReadRepository.cs` | `GetByLanguageAccountIdAsync` | `FlashcardCollections` |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionReadRepository.cs` | `GetByIdAsync` | `FlashcardCollections`, `LanguageAccounts` (joined) |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionReadRepository.cs` | `GetFlashcardByIdAsync` | `FlashcardCollections`, `LanguageAccounts` (joined) |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionReadRepository.cs` | `GetDueFlashcardsAsync` | `FlashcardCollections`, `LanguageAccounts` (joined) |
+
+#### EF Core Configurations — Cascade delete behaviour to review
+The current cascade configs will physically delete child rows when the parent is removed. After soft delete, `Remove()` is never called on soft-deletable entities, so these configs no longer trigger for `LanguageAccount` and `FlashcardCollection`. No change needed, but verify:
+
+| File | Current cascade | Status after Point 12 |
+|------|----------------|----------------------|
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionConfiguration.cs` | `OnDelete(DeleteBehavior.Cascade)` for `LanguageAccount → FlashcardCollection` | ✅ Safe — `LanguageAccount.Remove()` is never called |
+| `src/Infrastructure/FlashcardCollection/FlashcardCollectionConfiguration.cs` | `OnDelete(DeleteBehavior.Cascade)` for `FlashcardCollection → Flashcard` | ✅ Safe — `FlashcardCollection.Remove()` is never called |
+| `src/Infrastructure/FlashcardCollection/FlashcardConfiguration.cs` | `OnDelete(DeleteBehavior.Cascade)` for `Flashcard → FlashcardReview` | ✅ Unchanged — `Flashcard` still supports hard delete |
+
+#### Migration
+```bash
+dotnet ef migrations add AddSoftDeleteFields --project src/Infrastructure --startup-project src/Web.Api
+dotnet ef database update --project src/Infrastructure --startup-project src/Web.Api
+```
+
+---
 
 ### How
 
@@ -1644,9 +1697,11 @@ public interface ISoftDeletable
 }
 ```
 
-**Step 2 — Implement on `User`:**
+**Step 2 — Implement on `User`, `LanguageAccount`, `FlashcardCollection`:**
+
+Add to each entity (same pattern for all three):
 ```csharp
-// Add to User.cs
+// Example shown for User.cs — apply identically to LanguageAccount.cs and FlashcardCollection.cs
 public bool IsDeleted { get; private set; }
 public DateTime? DeletedAt { get; private set; }
 
@@ -1656,11 +1711,11 @@ public void Delete(DateTime utcNow)
     DeletedAt = utcNow;
 }
 ```
-Apply same pattern to `LanguageAccount` and `FlashcardCollection`.
+Then add `: ISoftDeletable` to each class declaration.
 
-**Step 3 — Global query filter + intercept in `ApplicationDbContext`:**
+**Step 3 — Global query filter + hard-delete intercept in `ApplicationDbContext`:**
 ```csharp
-// In OnModelCreating — apply filter to all ISoftDeletable entities
+// In OnModelCreating:
 foreach (var entityType in modelBuilder.Model.GetEntityTypes())
 {
     if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
@@ -1672,7 +1727,7 @@ foreach (var entityType in modelBuilder.Model.GetEntityTypes())
     }
 }
 
-// In SaveChangesAsync — convert hard deletes to soft deletes
+// In SaveChangesAsync, BEFORE PublishDomainEventsAsync:
 foreach (var entry in ChangeTracker.Entries<ISoftDeletable>()
     .Where(e => e.State == EntityState.Deleted))
 {
@@ -1681,23 +1736,85 @@ foreach (var entry in ChangeTracker.Entries<ISoftDeletable>()
 }
 ```
 
-**Step 4 — Update `DeleteLanguageAccountCommandHandler`:**
-```csharp
-// Before (hard delete)
-languageAccountRepository.Remove(languageAccount);
+Also add `using System.Linq.Expressions;` to the file.
 
-// After (soft delete — Remove() now triggers the interceptor automatically,
-// OR call Delete() explicitly and keep the entity in Modified state)
-languageAccount.Delete(dateTimeProvider.UtcNow);
+**Step 4 — Update the two delete command handlers:**
+```csharp
+// DeleteLanguageAccountCommandHandler.cs
+// BEFORE:
+languageAccountRepository.Remove(account);
+await applicationDbContext.SaveChangesAsync(cancellationToken);
+
+// AFTER:
+account.Delete(dateTimeProvider.UtcNow);
+await applicationDbContext.SaveChangesAsync(cancellationToken);
 ```
 
-> ⚠️ If you use the `SaveChangesAsync` interceptor approach, calling `Remove()` will automatically be converted — no handler change needed. But explicit `entity.Delete()` is cleaner and more readable.
+```csharp
+// DeleteFlashcardCollectionCommandHandler.cs
+// BEFORE:
+flashcardCollectionRepository.Remove(collection);
+await applicationDbContext.SaveChangesAsync(cancellationToken);
+
+// AFTER:
+collection.Delete(dateTimeProvider.UtcNow);
+await applicationDbContext.SaveChangesAsync(cancellationToken);
+```
+
+Both handlers need `IDateTimeProvider dateTimeProvider` added to their primary constructor parameters.
+
+**Step 5 — Add `AND IsDeleted = 0` to every Dapper query touching soft-deletable tables:**
+
+```csharp
+// UserReadRepository.cs — all three methods
+WHERE Email = @Email AND IsDeleted = 0
+WHERE Id = @UserId AND IsDeleted = 0
+
+// LanguageAccountReadRepository.cs
+WHERE UserId = @UserId AND IsDeleted = 0
+WHERE Id = @Id AND IsDeleted = 0
+
+// FlashcardCollectionReadRepository.cs — GetLanguageAccountUserIdAsync
+WHERE Id = @LanguageAccountId AND IsDeleted = 0
+
+// FlashcardCollectionReadRepository.cs — GetByLanguageAccountIdAsync
+WHERE LanguageAccountId = @LanguageAccountId AND IsDeleted = 0
+
+// FlashcardCollectionReadRepository.cs — GetByIdAsync (multi-table join)
+FROM dbo.FlashcardCollections fc
+INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
+WHERE fc.Id = @Id
+  AND fc.IsDeleted = 0        -- ← add
+  AND la.IsDeleted = 0        -- ← add
+
+// FlashcardCollectionReadRepository.cs — GetFlashcardByIdAsync (multi-table join)
+FROM dbo.Flashcards f
+INNER JOIN dbo.FlashcardCollections fc ON fc.Id = f.FlashcardCollectionId
+INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
+WHERE f.Id = @FlashcardId
+  AND fc.IsDeleted = 0        -- ← add
+  AND la.IsDeleted = 0        -- ← add
+
+// FlashcardCollectionReadRepository.cs — GetDueFlashcardsAsync (multi-table join)
+FROM dbo.Flashcards f
+INNER JOIN dbo.FlashcardCollections fc ON fc.Id = f.FlashcardCollectionId
+INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
+WHERE f.FlashcardCollectionId = @CollectionId
+  AND la.UserId = @UserId
+  AND fc.IsDeleted = 0        -- ← add
+  AND la.IsDeleted = 0        -- ← add
+  AND (ss.NextReviewDate IS NULL OR ss.NextReviewDate <= GETUTCDATE())
+```
 
 ### Verification
-- `GET /language-accounts/{id}` returns 404 after delete (filtered by global query filter)
-- Record still exists in DB with `IsDeleted = true`, `DeletedAt` set
-- `FlashcardCollections` linked to deleted `LanguageAccount` are still physically intact
-- No cascade physical delete occurs
+- `GET /language-accounts/{id}` returns 404 after delete (global EF filter active)
+- `GET /language-accounts` list excludes deleted accounts (Dapper filter active)
+- `GET /flashcard-collections/{id}` returns 404 after collection delete (Dapper filter on `fc.IsDeleted = 0`)
+- `GET /flashcards/{id}` returns 404 when parent collection or account is deleted (joined Dapper filters)
+- `GET /flashcards/due` returns empty list when collection or account is deleted
+- Login still works for a soft-deleted user (deliberate — auth check should happen before soft-delete check; adjust `GetByEmailForAuthAsync` filter if account deactivation should block login)
+- Records still exist in DB with `IsDeleted = true`, `DeletedAt` set
+- No cascade physical delete occurs on `FlashcardCollections` or `Flashcards` when `LanguageAccount` is soft-deleted
 
 ---
 

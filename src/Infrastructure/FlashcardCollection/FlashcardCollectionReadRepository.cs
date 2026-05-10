@@ -20,7 +20,8 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
         string sql = @"
             SELECT TOP 1 UserId
             FROM dbo.LanguageAccounts
-            WHERE Id = @LanguageAccountId";
+            WHERE Id = @LanguageAccountId
+              AND IsDeleted = 0";
 
         return await _dbConnection.QuerySingleOrDefaultAsync<Guid?>(sql, new { LanguageAccountId = languageAccountId });
     }
@@ -30,7 +31,8 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
         string sql = @"
             SELECT Id, LanguageAccountId, Name
             FROM dbo.FlashcardCollections
-            WHERE LanguageAccountId = @LanguageAccountId";
+            WHERE LanguageAccountId = @LanguageAccountId
+              AND IsDeleted = 0";
 
         IEnumerable<FlashcardCollectionListReadModel> result =
             await _dbConnection.QueryAsync<FlashcardCollectionListReadModel>(sql, new { LanguageAccountId = languageAccountId });
@@ -46,7 +48,9 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
             FROM dbo.FlashcardCollections fc
             INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
             LEFT JOIN dbo.Flashcards f ON f.FlashcardCollectionId = fc.Id
-            WHERE fc.Id = @Id";
+            WHERE fc.Id = @Id
+              AND fc.IsDeleted = 0
+              AND la.IsDeleted = 0";
 
         FlashcardCollectionDetailReadModel? collectionDetail = null;
 
@@ -99,7 +103,9 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
             FROM dbo.Flashcards f
             INNER JOIN dbo.FlashcardCollections fc ON fc.Id = f.FlashcardCollectionId
             INNER JOIN dbo.LanguageAccounts la ON la.Id = fc.LanguageAccountId
-            WHERE f.Id = @FlashcardId";
+            WHERE f.Id = @FlashcardId
+              AND fc.IsDeleted = 0
+              AND la.IsDeleted = 0";
 
         FlashcardRawRow? raw =
             await _dbConnection.QuerySingleOrDefaultAsync<FlashcardRawRow>(sql, new { FlashcardId = flashcardId });
@@ -148,6 +154,8 @@ public class FlashcardCollectionReadRepository : IFlashcardCollectionReadReposit
             LEFT JOIN dbo.SrsStates ss ON ss.FlashcardId = f.Id
             WHERE f.FlashcardCollectionId = @CollectionId
               AND la.UserId = @UserId
+              AND fc.IsDeleted = 0
+              AND la.IsDeleted = 0
               AND (ss.NextReviewDate IS NULL OR ss.NextReviewDate <= GETUTCDATE())";
 
         IEnumerable<DueFlashcardRawRow> rows = await _dbConnection.QueryAsync<DueFlashcardRawRow>(

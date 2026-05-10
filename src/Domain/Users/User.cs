@@ -3,13 +3,15 @@ using SharedKernel;
 
 namespace Domain.Users;
 
-public sealed class User : Entity
+public sealed class User : Entity, ISoftDeletable
 {
     public Guid Id { get; private set; }
     public Email Email { get; private set; }
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
     public string PasswordHash { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
 
     private User(Email email, string firstName, string lastName, string passwordHash)
     {
@@ -32,5 +34,11 @@ public sealed class User : Entity
         ArgumentNullException.ThrowIfNull(passwordHash);
 
         return new User(email, firstName, lastName, passwordHash);
+    }
+
+    public void Delete(DateTime utcNow)
+    {
+        IsDeleted = true;
+        DeletedAt = utcNow;
     }
 }

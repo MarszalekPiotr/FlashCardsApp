@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Linq.Expressions;
+using System.Text.Json;
 using Application;
 using Application.Abstractions.Data;
 using Domain.FlashcardCollection;
@@ -36,19 +37,28 @@ public sealed class ApplicationDbContext(
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
         modelBuilder.HasDefaultSchema(Schemas.Default);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+                var property = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+                var filter = Expression.Lambda(Expression.Not(property), parameter);
+                entityType.SetQueryFilter(filter);
+            }
+        }
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        // When should you publish domain events?
-        //
-        // 1. BEFORE calling SaveChangesAsync
-        //     - domain events are part of the same transaction
-        //     - immediate consistency
-        // 2. AFTER calling SaveChangesAsync
-        //     - domain events are a separate transaction
-        //     - eventual consistency
-        //     - handlers can fail
+        // Convert hard deletes to soft deletes for ISoftDeletable entities
+        foreach (var entry in ChangeTracker.Entries<ISoftDeletable>()
+            .Where(e => e.State == EntityState.Deleted))
+        {
+            entry.State = EntityState.Modified;
+            entry.Entity.Delete(dateTimeProvider.UtcNow);
+        }
 
         // Auto-stamp UpdatedAt for every modified entity
         foreach (var entry in ChangeTracker.Entries<Entity>())

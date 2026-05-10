@@ -13,7 +13,8 @@ internal sealed class DeleteLanguageAccountCommandHandler(
     ILanguageAccountRepository languageAccountRepository,
     IApplicationDbContext applicationDbContext,
     CanAccessLanguageAccountSpecification canAccessLanguageAccountSpecification,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<DeleteLanguageAccountCommand>
 {
     public async Task<Result> Handle(DeleteLanguageAccountCommand command, CancellationToken cancellationToken)
@@ -32,7 +33,7 @@ internal sealed class DeleteLanguageAccountCommandHandler(
             return Result.Failure(AuthorizationError.Forbidden());   
         }
 
-        languageAccountRepository.Remove(account);
+        account.Delete(dateTimeProvider.UtcNow);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

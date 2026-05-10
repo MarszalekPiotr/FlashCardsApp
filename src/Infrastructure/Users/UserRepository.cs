@@ -4,6 +4,7 @@ using Application.Users;
 using Domain.Users;
 using Domain.Users.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 
 namespace Infrastructure.Users;
 

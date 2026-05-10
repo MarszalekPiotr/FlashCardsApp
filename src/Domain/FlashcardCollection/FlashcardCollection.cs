@@ -3,11 +3,13 @@ using SharedKernel;
 
 namespace Domain.FlashcardCollection;
 
-public class FlashcardCollection : Entity
+public class FlashcardCollection : Entity, ISoftDeletable
 {
     public Guid Id { get; private set; }
     public Guid LanguageAccountId { get; private set; }
     public string Name { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
 
     private FlashcardCollection() { } // Required by EF Core — must NOT raise events
 
@@ -37,5 +39,11 @@ public class FlashcardCollection : Entity
         }
 
         Name = name;
+    }
+
+    public void Delete(DateTime utcNow)
+    {
+        IsDeleted = true;
+        DeletedAt = utcNow;
     }
 }

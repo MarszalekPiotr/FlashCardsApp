@@ -24,7 +24,8 @@ public class LanguageAccountReadRepository : ILanguageAccountReadRepository
                 JSON_VALUE(Language, '$.FullName') AS LanguageFullName,
                 ProficiencyLevel
             FROM dbo.LanguageAccounts
-            WHERE UserId = @UserId";
+            WHERE UserId = @UserId
+              AND IsDeleted = 0";
 
         IEnumerable<LanguageAccountListReadModel> result =
             await _dbConnection.QueryAsync<LanguageAccountListReadModel>(sql, new { UserId = userId });
@@ -42,7 +43,8 @@ public class LanguageAccountReadRepository : ILanguageAccountReadRepository
                 JSON_VALUE(Language, '$.FullName') AS LanguageFullName,
                 ProficiencyLevel
             FROM dbo.LanguageAccounts
-            WHERE Id = @Id";
+            WHERE Id = @Id
+              AND IsDeleted = 0";
 
         return await _dbConnection.QuerySingleOrDefaultAsync<LanguageAccountDetailReadModel>(sql, new { Id = id });
     }
