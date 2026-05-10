@@ -952,50 +952,89 @@ The FluentValidation validator likely already validates email format at the appl
 
 ---
 
-## Point 8 — Unit Tests for SrsCalculationService
+## Point 8 — Unit Tests
 
 ### Why
-`SrsCalculationService` implements the SM-2 spaced repetition algorithm which is the **core business logic** of the application. Currently it has **zero tests**. Any refactoring could silently break the algorithm and no one would know until users report incorrect review schedules.
+The application has zero unit tests. The core SRS algorithm, value objects with validation logic, and domain entity behaviour are completely unprotected — any refactoring can silently break business rules.
 
-### New Project / Test File
-
-Create a new test project (or add to an existing `Domain.Tests` project):
+### Test project structure
 
 ```
 tests/
   Domain.Tests/
     Domain.Tests.csproj
     FlashcardCollection/
-      SrsCalculationServiceTests.cs
+      SrsCalculationServiceTests.cs   ← SM-2 algorithm
+      FlashcardTests.cs               ← Flashcard.AddReview() + Flashcard.Create() guards
+      SynonymsTests.cs                ← Synonyms value object
+    Users/
+      EmailTests.cs                   ← Email.Create() Result pattern
+      UserTests.cs                    ← User.Create() + ISoftDeletable behaviour
+    LanguageAccount/
+      LanguageAccountTests.cs         ← LanguageAccount.Delete() soft delete
+    FlashcardCollectionTests.cs       ← FlashcardCollection.Create() + Rename() + Delete()
+  Application.Tests/
+    Application.Tests.csproj
+    Users/
+      RegisterUserCommandValidatorTests.cs
+    FlashcardCollection/
+      AddFlashcardReviewCommandValidatorTests.cs
 ```
 
 **`tests/Domain.Tests/Domain.Tests.csproj`**
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
-    <PackageReference Include="xunit" Version="2.7.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="Shouldly" Version="4.2.1" />
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Domain\Domain.csproj" />
   </ItemGroup>
-
 </Project>
 ```
 
-**`tests/Domain.Tests/FlashcardCollection/SrsCalculationServiceTests.cs`**
+**`tests/Application.Tests/Application.Tests.csproj`**
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Shouldly" Version="4.2.1" />
+    <PackageReference Include="FluentValidation.TestHelper" Version="11.9.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Application\Application.csproj" />
+    <ProjectReference Include="..\..\src\Domain\Domain.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+> ⚠️ `SrsState.UpdateState()` is currently `public` — no `InternalsVisibleTo` needed. Verify before running tests.
+
+---
+
+### Test suite 1 — `SrsCalculationServiceTests.cs`
+
+**File:** `tests/Domain.Tests/FlashcardCollection/SrsCalculationServiceTests.cs`
+
+Tests the SM-2 algorithm in `SrsCalculationService`. All tests are pure (no mocks, no DB).
+
 ```csharp
 using Domain.FlashcardCollection;
 using Domain.FlashcardCollection.DomainServices;
@@ -1007,245 +1046,657 @@ namespace Domain.Tests.FlashcardCollection;
 public sealed class SrsCalculationServiceTests
 {
     private readonly SrsCalculationService _sut = new();
-    private readonly DateTime _referenceTime = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+    private readonly DateTime _t0 = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
-    // ─────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────
+    private SrsState FreshState() => SrsState.CreateInitialState(Guid.NewGuid(), _t0);
 
-    private static SrsState CreateSrsState(
-        int interval = 1,
-        double easeFactor = 2.5,
-        int repetitions = 0) =>
-        // SrsState.CreateInitialState sets known defaults; we bypass it
-        // by using the internal test helper or reflection if needed.
-        // If SrsState has no test-friendly factory, use CreateInitialState and
-        // then call UpdateState to set the desired values.
-        SrsState.CreateInitialState(Guid.NewGuid(), DateTime.UtcNow);
-
-    // ─────────────────────────────────────────────────────────────
-    // FIRST REVIEW (repetitions == 0)
-    // ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void CalculateNextState_FirstReview_Easy_SetsIntervalTo1()
-    {
-        // Arrange
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        // Act
-        var result = _sut.CalculateNextState(state, ReviewResult.Easy, _referenceTime);
-
-        // Assert
-        result.Interval.ShouldBe(1);
-        result.Repetitions.ShouldBe(1);
-        result.EaseFactor.ShouldBeGreaterThan(2.5); // Easy increases ease
-        result.NextReviewDate.ShouldBe(_referenceTime.AddDays(1));
-    }
-
-    [Fact]
-    public void CalculateNextState_FirstReview_Know_SetsIntervalTo1()
-    {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        var result = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime);
-
-        result.Interval.ShouldBe(1);
-        result.Repetitions.ShouldBe(1);
-        result.NextReviewDate.ShouldBe(_referenceTime.AddDays(1));
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // FAILED REVIEW — resets progress
-    // ─────────────────────────────────────────────────────────────
+    // ── First review ──────────────────────────────────────────────────────────
 
     [Theory]
-    [InlineData(ReviewResult.Again)]
-    [InlineData(ReviewResult.DontKnow)]
-    public void CalculateNextState_FailedReview_ResetsRepetitionsAndInterval(ReviewResult result)
+    [InlineData(ReviewResult.Easy)]
+    [InlineData(ReviewResult.Know)]
+    public void FirstReview_Success_SetsIntervalTo1AndRepetitionsTo1(ReviewResult result)
     {
-        // Arrange — simulate a card with existing progress
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        // Advance state to repetitions=3, interval=10 via two successful reviews
-        var after1 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime);
-        state.UpdateState(after1);
-        var after2 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime.AddDays(1));
-        state.UpdateState(after2);
-        var after3 = _sut.CalculateNextState(state, ReviewResult.Easy, _referenceTime.AddDays(4));
-        state.UpdateState(after3);
-        // state.Repetitions should now be 3
-
-        // Act — fail
-        var failResult = _sut.CalculateNextState(state, result, _referenceTime.AddDays(10));
-
-        // Assert
-        failResult.Repetitions.ShouldBe(0);
-        failResult.Interval.ShouldBe(1);
-        failResult.EaseFactor.ShouldBeGreaterThanOrEqualTo(1.3); // minimum clamped
+        var state = FreshState();
+        var calc = _sut.CalculateNextState(state, result, _t0);
+        calc.Interval.ShouldBe(1);
+        calc.Repetitions.ShouldBe(1);
+        calc.NextReviewDate.ShouldBe(_t0.AddDays(1));
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // EASE FACTOR ADJUSTMENTS
-    // ─────────────────────────────────────────────────────────────
+    // ── Interval progression (SM-2 standard sequence) ─────────────────────────
 
     [Fact]
-    public void CalculateNextState_Easy_IncreasesEaseFactorBy015()
+    public void SecondSuccessfulReview_SetsIntervalTo3()
     {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        double originalEase = state.EaseFactor;
-
-        var result = _sut.CalculateNextState(state, ReviewResult.Easy, _referenceTime);
-
-        result.EaseFactor.ShouldBe(originalEase + 0.15, tolerance: 0.001);
-    }
-
-    [Fact]
-    public void CalculateNextState_Know_IncreasesEaseFactorBy005()
-    {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        double originalEase = state.EaseFactor;
-
-        var result = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime);
-
-        result.EaseFactor.ShouldBe(originalEase + 0.05, tolerance: 0.001);
-    }
-
-    [Theory]
-    [InlineData(ReviewResult.Again)]
-    [InlineData(ReviewResult.DontKnow)]
-    public void CalculateNextState_Fail_DecreasesEaseFactorBy02(ReviewResult reviewResult)
-    {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        double originalEase = state.EaseFactor;
-        double expected = Math.Max(1.3, originalEase - 0.2);
-
-        var result = _sut.CalculateNextState(state, reviewResult, _referenceTime);
-
-        result.EaseFactor.ShouldBe(expected, tolerance: 0.001);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // MINIMUM EASE FACTOR CLAMP
-    // ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void CalculateNextState_EaseFactorNeverDropsBelowMinimum()
-    {
-        // Simulate many failures to try to drive EaseFactor below 1.3
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        for (int i = 0; i < 20; i++)
-        {
-            var result = _sut.CalculateNextState(state, ReviewResult.Again, _referenceTime.AddDays(i));
-            state.UpdateState(result);
-        }
-
-        state.EaseFactor.ShouldBeGreaterThanOrEqualTo(1.3);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // INTERVAL PROGRESSION — SM-2 STANDARD SEQUENCE
-    // ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void CalculateNextState_SecondSuccessfulReview_SetsIntervalTo3()
-    {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        // First review
-        var r1 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime);
-        state.UpdateState(r1);
-
-        // Second review
-        var r2 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime.AddDays(1));
-
+        var state = FreshState();
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Know, _t0));
+        var r2 = _sut.CalculateNextState(state, ReviewResult.Know, _t0.AddDays(1));
         r2.Interval.ShouldBe(3);
         r2.Repetitions.ShouldBe(2);
     }
 
     [Fact]
-    public void CalculateNextState_ThirdSuccessfulReview_UsesEaseFactorMultiplier()
+    public void ThirdSuccessfulReview_UsesEaseFactorMultiplier()
     {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        var r1 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime);
-        state.UpdateState(r1);
-        var r2 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime.AddDays(1));
-        state.UpdateState(r2);
-        var r3 = _sut.CalculateNextState(state, ReviewResult.Know, _referenceTime.AddDays(4));
-
-        // interval = round(3 * easeFactor)
+        var state = FreshState();
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Know, _t0));
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Know, _t0.AddDays(1)));
+        var r3 = _sut.CalculateNextState(state, ReviewResult.Know, _t0.AddDays(4));
         int expected = (int)Math.Round(3 * state.EaseFactor);
         r3.Interval.ShouldBe(expected);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // NEXT REVIEW DATE
-    // ─────────────────────────────────────────────────────────────
+    // ── Failed review — resets progress ───────────────────────────────────────
+
+    [Theory]
+    [InlineData(ReviewResult.Again)]
+    [InlineData(ReviewResult.DontKnow)]
+    public void FailedReview_ResetsIntervalAndRepetitionsToZero(ReviewResult failResult)
+    {
+        var state = FreshState();
+        // Advance to repetitions = 3
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Know, _t0));
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Know, _t0.AddDays(1)));
+        state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Easy, _t0.AddDays(4)));
+
+        var calc = _sut.CalculateNextState(state, failResult, _t0.AddDays(10));
+
+        calc.Repetitions.ShouldBe(0);
+        calc.Interval.ShouldBe(1);
+    }
+
+    // ── Ease factor adjustments ───────────────────────────────────────────────
 
     [Fact]
-    public void CalculateNextState_NextReviewDate_IsCurrentTimePlusInterval()
+    public void Easy_IncreasesEaseFactorBy0_15()
     {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        var reviewTime = new DateTime(2026, 6, 15, 9, 30, 0, DateTimeKind.Utc);
-
-        var result = _sut.CalculateNextState(state, ReviewResult.Know, reviewTime);
-
-        result.NextReviewDate.ShouldBe(reviewTime.AddDays(result.Interval));
+        var state = FreshState();
+        var calc = _sut.CalculateNextState(state, ReviewResult.Easy, _t0);
+        calc.EaseFactor.ShouldBe(state.EaseFactor + 0.15, tolerance: 0.001);
     }
 
     [Fact]
-    public void CalculateNextState_MidnightReview_NextReviewDateIsCorrect()
+    public void Know_IncreasesEaseFactorBy0_05()
     {
-        // Regression: ensure midnight boundary doesn't cause off-by-one
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-        var midnight = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        var result = _sut.CalculateNextState(state, ReviewResult.Know, midnight);
-
-        result.NextReviewDate.ShouldBe(midnight.AddDays(result.Interval));
-        result.NextReviewDate.Hour.ShouldBe(0);
-        result.NextReviewDate.Minute.ShouldBe(0);
+        var state = FreshState();
+        var calc = _sut.CalculateNextState(state, ReviewResult.Know, _t0);
+        calc.EaseFactor.ShouldBe(state.EaseFactor + 0.05, tolerance: 0.001);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // VALIDATION
-    // ─────────────────────────────────────────────────────────────
+    [Theory]
+    [InlineData(ReviewResult.Again)]
+    [InlineData(ReviewResult.DontKnow)]
+    public void Fail_DecreasesEaseFactorBy0_20(ReviewResult failResult)
+    {
+        var state = FreshState();
+        double expected = Math.Max(1.3, state.EaseFactor - 0.2);
+        var calc = _sut.CalculateNextState(state, failResult, _t0);
+        calc.EaseFactor.ShouldBe(expected, tolerance: 0.001);
+    }
+
+    // ── Ease factor minimum clamp ─────────────────────────────────────────────
 
     [Fact]
-    public void CalculateNextState_Result_IsAlwaysValid()
+    public void EaseFactor_NeverDropsBelowMinimum_After20Failures()
     {
-        var state = SrsState.CreateInitialState(Guid.NewGuid(), _referenceTime);
-
-        foreach (ReviewResult reviewResult in Enum.GetValues<ReviewResult>())
+        var state = FreshState();
+        for (int i = 0; i < 20; i++)
         {
-            var result = _sut.CalculateNextState(state, reviewResult, _referenceTime);
-            result.IsValid().ShouldBeTrue($"Result should be valid for ReviewResult.{reviewResult}");
+            state.UpdateState(_sut.CalculateNextState(state, ReviewResult.Again, _t0.AddDays(i)));
         }
+        state.EaseFactor.ShouldBeGreaterThanOrEqualTo(1.3);
     }
 
+    // ── NextReviewDate ────────────────────────────────────────────────────────
+
     [Fact]
-    public void CalculateNextState_NullState_ThrowsArgumentNullException()
+    public void NextReviewDate_IsReviewTimePlusInterval()
+    {
+        var state = FreshState();
+        var reviewTime = new DateTime(2026, 6, 15, 9, 30, 0, DateTimeKind.Utc);
+        var calc = _sut.CalculateNextState(state, ReviewResult.Know, reviewTime);
+        calc.NextReviewDate.ShouldBe(reviewTime.AddDays(calc.Interval));
+    }
+
+    // ── Guard clauses ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void NullState_ThrowsArgumentNullException()
     {
         Should.Throw<ArgumentNullException>(
-            () => _sut.CalculateNextState(null!, ReviewResult.Know, _referenceTime));
+            () => _sut.CalculateNextState(null!, ReviewResult.Know, _t0));
+    }
+
+    // ── SrsStateCalculation.IsValid() ─────────────────────────────────────────
+
+    [Fact]
+    public void AllReviewResults_ProduceValidCalculation()
+    {
+        var state = FreshState();
+        foreach (ReviewResult r in Enum.GetValues<ReviewResult>())
+        {
+            _sut.CalculateNextState(state, r, _t0).IsValid().ShouldBeTrue();
+        }
     }
 }
 ```
 
-> ⚠️ **Important:** `SrsState.UpdateState(SrsStateCalculation)` must have `internal` or `public` visibility for tests to advance state between reviews. Check `SrsState.cs` — if `UpdateState` is `internal`, add `[assembly: InternalsVisibleTo("Domain.Tests")]` to `src/Domain/Domain.csproj` or make the method `public`.
+---
 
-### Add Project to Solution
+### Test suite 2 — `EmailTests.cs`
+
+**File:** `tests/Domain.Tests/Users/EmailTests.cs`
+
+Tests the `Email.Create()` Result pattern — the first place where user input is validated.
+
+```csharp
+using Domain.Users.ValueObjects;
+using SharedKernel;
+using Shouldly;
+
+namespace Domain.Tests.Users;
+
+public sealed class EmailTests
+{
+    // ── Valid inputs ──────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("user@example.com")]
+    [InlineData("USER@EXAMPLE.COM")]          // case-insensitive
+    [InlineData("user.name+tag@sub.domain.io")]
+    public void Create_ValidEmail_ReturnsSuccess(string email)
+    {
+        var result = Email.Create(email);
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Value.ShouldBe(email);
+    }
+
+    // ── Invalid inputs ────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Create_NullOrWhitespace_ReturnsEmptyError(string? email)
+    {
+        var result = Email.Create(email!);
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("Email.Empty");
+    }
+
+    [Theory]
+    [InlineData("notanemail")]
+    [InlineData("missing@tld")]
+    [InlineData("@nodomain.com")]
+    [InlineData("spaces in@email.com")]
+    public void Create_InvalidFormat_ReturnsInvalidFormatError(string email)
+    {
+        var result = Email.Create(email);
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("Email.InvalidFormat");
+    }
+
+    // ── Value equality (record semantics) ─────────────────────────────────────
+
+    [Fact]
+    public void TwoEmailsWithSameValue_AreEqual()
+    {
+        var a = Email.Create("user@example.com").Value;
+        var b = Email.Create("user@example.com").Value;
+        a.ShouldBe(b);
+    }
+}
+```
+
+---
+
+### Test suite 3 — `SynonymsTests.cs`
+
+**File:** `tests/Domain.Tests/FlashcardCollection/SynonymsTests.cs`
+
+Tests the `Synonyms` value object which enforces uniqueness and no-whitespace rules.
+
+```csharp
+using Domain.FlashcardCollection;
+using Shouldly;
+
+namespace Domain.Tests.FlashcardCollection;
+
+public sealed class SynonymsTests
+{
+    [Fact]
+    public void Create_EmptyList_IsAllowed()
+    {
+        var s = new Synonyms([]);
+        s.Value.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Create_ValidList_StoresValues()
+    {
+        var s = new Synonyms(["walked", "traveled"]);
+        s.Value.ShouldBe(["walked", "traveled"]);
+    }
+
+    [Fact]
+    public void Create_DuplicateCaseInsensitive_ThrowsArgumentException()
+    {
+        Should.Throw<ArgumentException>(() => new Synonyms(["walk", "WALK"]));
+    }
+
+    [Fact]
+    public void Create_WhitespaceSynonym_ThrowsArgumentException()
+    {
+        Should.Throw<ArgumentException>(() => new Synonyms(["valid", "   "]));
+    }
+
+    [Fact]
+    public void Create_NullList_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() => new Synonyms(null!));
+    }
+}
+```
+
+---
+
+### Test suite 4 — `FlashcardTests.cs`
+
+**File:** `tests/Domain.Tests/FlashcardCollection/FlashcardTests.cs`
+
+Tests `Flashcard.Create()` guard clauses and `AddReview()` — the core domain behaviour that integrates `SrsCalculationService`.
+
+```csharp
+using Domain.FlashcardCollection;
+using Domain.FlashcardCollection.DomainServices;
+using Domain.FlashcardCollection.Enums;
+using Shouldly;
+
+namespace Domain.Tests.FlashcardCollection;
+
+public sealed class FlashcardTests
+{
+    private static readonly DateTime T0 = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly Guid CollectionId = Guid.NewGuid();
+    private readonly SrsCalculationService _srs = new();
+
+    private static Flashcard CreateDefault() =>
+        Flashcard.Create(CollectionId, "I ___ yesterday", "Byłem tu wczoraj", "was", new Synonyms([]), T0);
+
+    // ── Flashcard.Create() guards ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("", "translation", "answer")]
+    [InlineData("sentence", "", "answer")]
+    [InlineData("sentence", "translation", "")]
+    public void Create_EmptyRequiredField_ThrowsArgumentException(
+        string sentence, string translation, string answer)
+    {
+        Should.Throw<ArgumentException>(() =>
+            Flashcard.Create(CollectionId, sentence, translation, answer, new Synonyms([]), T0));
+    }
+
+    [Fact]
+    public void Create_NullSynonyms_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() =>
+            Flashcard.Create(CollectionId, "s", "t", "a", null!, T0));
+    }
+
+    // ── Initial SrsState ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_InitialSrsState_HasZeroIntervalAndRepetitions()
+    {
+        var f = CreateDefault();
+        f.SrsState.Interval.ShouldBe(0);
+        f.SrsState.Repetitions.ShouldBe(0);
+        f.SrsState.EaseFactor.ShouldBe(2.5);
+    }
+
+    [Fact]
+    public void Create_InitialReviews_IsEmpty()
+    {
+        var f = CreateDefault();
+        f.Reviews.ShouldBeEmpty();
+    }
+
+    // ── AddReview() ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddReview_Know_UpdatesSrsStateAndAddsReview()
+    {
+        var f = CreateDefault();
+        f.AddReview(ReviewResult.Know, _srs, T0);
+
+        f.Reviews.Count.ShouldBe(1);
+        f.SrsState.Repetitions.ShouldBe(1);
+        f.SrsState.Interval.ShouldBe(1);
+        f.SrsState.NextReviewDate.ShouldBe(T0.AddDays(1));
+    }
+
+    [Fact]
+    public void AddReview_Again_ResetsProgressAndAddsReview()
+    {
+        var f = CreateDefault();
+        f.AddReview(ReviewResult.Know, _srs, T0);       // advance to rep=1
+        f.AddReview(ReviewResult.Again, _srs, T0.AddDays(1));  // fail
+
+        f.Reviews.Count.ShouldBe(2);
+        f.SrsState.Repetitions.ShouldBe(0);
+        f.SrsState.Interval.ShouldBe(1);
+    }
+
+    [Fact]
+    public void AddReview_RaisesFlashcardReviewedDomainEvent()
+    {
+        var f = CreateDefault();
+        f.AddReview(ReviewResult.Easy, _srs, T0);
+        f.DomainEvents.ShouldContain(e => e.GetType().Name == "FlashcardReviewedDomainEvent");
+    }
+
+    [Fact]
+    public void AddReview_NullSrsService_ThrowsArgumentNullException()
+    {
+        var f = CreateDefault();
+        Should.Throw<ArgumentNullException>(() => f.AddReview(ReviewResult.Know, null!, T0));
+    }
+}
+```
+
+---
+
+### Test suite 5 — `UserTests.cs`
+
+**File:** `tests/Domain.Tests/Users/UserTests.cs`
+
+Tests `User.Create()` guard clauses, auto-raised domain event, and `ISoftDeletable` behaviour.
+
+```csharp
+using Domain.Users;
+using Domain.Users.ValueObjects;
+using SharedKernel;
+using Shouldly;
+
+namespace Domain.Tests.Users;
+
+public sealed class UserTests
+{
+    private static Email ValidEmail() => Email.Create("user@example.com").Value;
+
+    // ── User.Create() guards ──────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_NullEmail_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() =>
+            User.Create(null!, "First", "Last", "hash"));
+    }
+
+    [Fact]
+    public void Create_ValidInputs_ReturnsUser()
+    {
+        var user = User.Create(ValidEmail(), "Alice", "Smith", "hash");
+        user.Email.Value.ShouldBe("user@example.com");
+        user.FirstName.ShouldBe("Alice");
+        user.IsDeleted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Create_RaisesUserRegisteredDomainEvent()
+    {
+        var user = User.Create(ValidEmail(), "Alice", "Smith", "hash");
+        user.DomainEvents.ShouldContain(e => e.GetType().Name == "UserRegisteredDomainEvent");
+    }
+
+    [Fact]
+    public void Create_IdIsNotEmpty()
+    {
+        var user = User.Create(ValidEmail(), "Alice", "Smith", "hash");
+        user.Id.ShouldNotBe(Guid.Empty);
+    }
+
+    // ── ISoftDeletable ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Delete_SetsIsDeletedTrueAndDeletedAt()
+    {
+        var user = User.Create(ValidEmail(), "Alice", "Smith", "hash");
+        var deletedAt = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        user.Delete(deletedAt);
+
+        user.IsDeleted.ShouldBeTrue();
+        user.DeletedAt.ShouldBe(deletedAt);
+    }
+}
+```
+
+---
+
+### Test suite 6 — `FlashcardCollectionTests.cs`
+
+**File:** `tests/Domain.Tests/FlashcardCollectionTests.cs`
+
+Tests `FlashcardCollection.Create()`, `Rename()`, and `Delete()`.
+
+```csharp
+using Domain.FlashcardCollection;
+using Shouldly;
+
+namespace Domain.Tests;
+
+public sealed class FlashcardCollectionTests
+{
+    private static readonly Guid AccountId = Guid.NewGuid();
+
+    // ── Create ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_ValidInputs_ReturnsCollection()
+    {
+        var c = FlashcardCollection.Create(AccountId, "German Basics");
+        c.Name.ShouldBe("German Basics");
+        c.LanguageAccountId.ShouldBe(AccountId);
+        c.IsDeleted.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Create_NullOrWhitespaceName_ThrowsArgumentException(string? name)
+    {
+        Should.Throw<ArgumentException>(() => FlashcardCollection.Create(AccountId, name!));
+    }
+
+    [Fact]
+    public void Create_RaisesFlashcardCollectionCreatedDomainEvent()
+    {
+        var c = FlashcardCollection.Create(AccountId, "Test");
+        c.DomainEvents.ShouldContain(e => e.GetType().Name == "FlashcardCollectionCreatedDomainEvent");
+    }
+
+    // ── Rename ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Rename_ValidName_UpdatesName()
+    {
+        var c = FlashcardCollection.Create(AccountId, "Old");
+        c.Rename("New Name");
+        c.Name.ShouldBe("New Name");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Rename_WhitespaceName_ThrowsArgumentException(string name)
+    {
+        var c = FlashcardCollection.Create(AccountId, "Test");
+        Should.Throw<ArgumentException>(() => c.Rename(name));
+    }
+
+    // ── ISoftDeletable ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Delete_SetsIsDeletedAndDeletedAt()
+    {
+        var c = FlashcardCollection.Create(AccountId, "Test");
+        var deletedAt = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        c.Delete(deletedAt);
+
+        c.IsDeleted.ShouldBeTrue();
+        c.DeletedAt.ShouldBe(deletedAt);
+    }
+}
+```
+
+---
+
+### Test suite 7 — `RegisterUserCommandValidatorTests.cs`
+
+**File:** `tests/Application.Tests/Users/RegisterUserCommandValidatorTests.cs`
+
+Tests the FluentValidation rules in `RegisterUserCommandValidator` using `TestValidate()`.
+
+```csharp
+using Application.Users.Register;
+using FluentValidation.TestHelper;
+using Shouldly;
+
+namespace Application.Tests.Users;
+
+public sealed class RegisterUserCommandValidatorTests
+{
+    private readonly RegisterUserCommandValidator _validator = new();
+
+    private static RegisterUserCommand ValidCommand() => new(
+        "user@example.com", "Alice", "Smith", "SecurePass1!");
+
+    [Fact]
+    public void ValidCommand_PassesValidation()
+    {
+        _validator.TestValidate(ValidCommand()).ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void EmptyEmail_FailsValidation(string? email)
+    {
+        var cmd = ValidCommand() with { Email = email! };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.Email);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void EmptyFirstName_FailsValidation(string? name)
+    {
+        var cmd = ValidCommand() with { FirstName = name! };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.FirstName);
+    }
+
+    [Fact]
+    public void PasswordTooShort_FailsValidation()
+    {
+        var cmd = ValidCommand() with { Password = "abc" };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.Password);
+    }
+
+    [Fact]
+    public void EmptyPassword_FailsValidation()
+    {
+        var cmd = ValidCommand() with { Password = "" };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.Password);
+    }
+}
+```
+
+> ⚠️ `RegisterUserCommand` must be a `record` with a `with` expression — verify it is not a plain `class`. If it is a class, construct separate instances instead.
+
+---
+
+### Test suite 8 — `AddFlashcardReviewCommandValidatorTests.cs`
+
+**File:** `tests/Application.Tests/FlashcardCollection/AddFlashcardReviewCommandValidatorTests.cs`
+
+```csharp
+using Application.FlashcardCollection.Commands.AddFlashcardReview;
+using Domain.FlashcardCollection.Enums;
+using FluentValidation.TestHelper;
+
+namespace Application.Tests.FlashcardCollection;
+
+public sealed class AddFlashcardReviewCommandValidatorTests
+{
+    private readonly AddFlashcardReviewCommandValidator _validator = new();
+
+    private static AddFlashcardReviewCommand ValidCommand() => new(
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), ReviewResult.Know);
+
+    [Fact]
+    public void ValidCommand_PassesValidation()
+    {
+        _validator.TestValidate(ValidCommand()).ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void EmptyCollectionId_FailsValidation()
+    {
+        var cmd = ValidCommand() with { FlaschardCollectionId = Guid.Empty };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.FlaschardCollectionId);
+    }
+
+    [Fact]
+    public void EmptyFlashcardId_FailsValidation()
+    {
+        var cmd = ValidCommand() with { FlashcardId = Guid.Empty };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.FlashcardId);
+    }
+
+    [Fact]
+    public void InvalidReviewResult_FailsValidation()
+    {
+        var cmd = ValidCommand() with { ReviewResult = (ReviewResult)999 };
+        _validator.TestValidate(cmd).ShouldHaveValidationErrorFor(c => c.ReviewResult);
+    }
+}
+```
+
+> ⚠️ Check the actual property name on `AddFlashcardReviewCommand` — the validator uses `FlaschardCollectionId` (note the typo). Match whatever name exists in the command record.
+
+---
+
+### Add projects to solution
 
 ```bash
 dotnet sln CleanArchitecture.slnx add tests/Domain.Tests/Domain.Tests.csproj
+dotnet sln CleanArchitecture.slnx add tests/Application.Tests/Application.Tests.csproj
 ```
 
-### Verification
+### Run all unit tests
+
 ```bash
-dotnet test tests/Domain.Tests/
+dotnet test tests/Domain.Tests/ tests/Application.Tests/ --logger "console;verbosity=normal"
 ```
-All tests should pass. If `SrsState` doesn't expose enough for testing, expose a test-only factory or use `InternalsVisibleTo`.
+
+### Verification — expected results
+
+| Test class | Tests | What it protects |
+|------------|-------|-----------------|
+| `SrsCalculationServiceTests` | ~11 | SM-2 algorithm correctness — interval, ease factor, clamp, reset |
+| `EmailTests` | ~8 | Validation Result pattern — no exceptions leak to callers |
+| `SynonymsTests` | ~5 | Uniqueness + whitespace rules |
+| `FlashcardTests` | ~7 | `AddReview()` wires SRS + appends review + raises event |
+| `UserTests` | ~5 | Guard clauses, domain event auto-raise, soft delete |
+| `FlashcardCollectionTests` | ~7 | Create/Rename guards, domain event, soft delete |
+| `RegisterUserCommandValidatorTests` | ~6 | FluentValidation boundary — bad input caught before handler |
+| `AddFlashcardReviewCommandValidatorTests` | ~4 | Command validation |
+
+**Total: ~53 tests, zero mocks, zero DB.**
 
 ---
 
