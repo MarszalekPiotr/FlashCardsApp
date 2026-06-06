@@ -11,4 +11,6 @@ public class Language : Entity
     public string Code { get; set; }
     public bool IsActive { get; set; }
 
+    // Override CreatedAt with public setter for HasData seed
+    public new DateTime CreatedAt { get; set; }
 }
