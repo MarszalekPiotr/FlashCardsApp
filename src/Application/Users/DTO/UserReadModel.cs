@@ -8,7 +8,7 @@ namespace Application.Users.DTO;
 public class UserReadModel
 {
     public Guid Id { get; set; }
-    public Email Email { get; set; }
+    public string Email { get; set; }
     public string FirstName { get; set; }
     public string LastName { get; set; }
 }
