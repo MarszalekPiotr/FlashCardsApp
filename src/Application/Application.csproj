@@ -15,6 +15,7 @@
 
   <ItemGroup>
 	<InternalsVisibleTo Include="Application.UnitTests" />
+	<InternalsVisibleTo Include="Application.Tests" />
   </ItemGroup>
 
   <ItemGroup>

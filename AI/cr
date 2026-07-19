@@ -1,0 +1,870 @@
+# FlashCardsApp - Code Review
+
+**Date:** 2026-04-22  
+**Compared against:** `ddd-implementation-review.md`, `architectural-review-and-refactoring-plan.md`, `review.md`, `ddd-pojecia-wyjasnienie.md`
+
+---
+
+## Executive Summary
+
+**Overall Grade: B+**
+
+The codebase improved significantly since earlier AI reviews. Critical violations were fixed:
+- `SrsState` is now a child of `Flashcard` aggregate
+- `SrsCalculationService` is a proper Domain Service
+- Authorization extracted to Specification pattern
+- Outbox Pattern implemented for domain events
+- Repositories no longer create entities
+- `IDateTimeProvider` enables testable time
+
+Remaining gaps prevent this from being a reference-grade DDD implementation.
+
+---
+
+## 1. Domain Layer
+
+### 1.1 Aggregate Design
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `User` Aggregate Root | ✅ Good | `Email` VO, private ctor + static factory |
+| `LanguageAccount` Aggregate Root | ✅ Fixed | No longer owns `FlashcardCollection` collections; uses FK only |
+| `FlashcardCollection` Aggregate Root | ✅ Good | Owns `Flashcard` entities |
+| `Flashcard` Entity | ✅ Excellent | Encapsulates `SrsState` child + `AddReview` method raises event atomically |
+| Bounded Context count | ✅ Acceptable | 3 contexts (User, LanguageAccount, FlashcardCollection). Close to plan's recommendation of 2 for MVP. |
+
+**Evidence:**
+```csharp
+@/c:\Repos\Piotr\src\Domain\FlashcardCollection\Flashcard.cs:18
+public SrsState SrsState { get; private set; }
+```
+```csharp
+@/c:\Repos\Piotr\src\Domain\FlashcardCollection\Flashcard.cs:72-85
+public FlashcardReview AddReview(ReviewResult reviewResult, SrsCalculationService srsCalculationService, DateTime currentTime)
+```
+
+### 1.2 Domain Services
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `SrsCalculationService` | ✅ Excellent | Stateless, pure algorithm, no infra deps, fully testable |
+| `SrsStateCalculation` record | ✅ Good | Immutable result DTO |
+
+### 1.3 Domain Events — Event Raising Location
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `FlashcardReviewedDomainEvent` | ✅ Correct | Raised inside `Flashcard.AddReview` |
+| `UserRegisteredDomainEvent` | ⚠️ Delayed | Raised in `RegisterUserCommandHandler:34`, not inside `User.Create` |
+| `FlashcardCollectionCreatedDomainEvent` | ⚠️ Delayed | Raised in `CreateFlashcardCollectionCommandHandler:44`, not inside factory |
+
+**Problem:** Events raised in handlers, not the domain, means the domain itself doesn't enforce the invariant "a registered user must emit a `UserRegistered` event."
+
+**Fix:** Move `Raise(...)` into entity constructors:
+```csharp
+// Current (handler)
+var user = User.Create(...);
+await userWriteRepository.AddAsync(user);
+user.Raise(new UserRegisteredDomainEvent(user.Id));  // ❌ handler responsibility
+
+// Better (entity)
+private User(...)
+{
+    Id = Guid.NewGuid();
+    // ...
+    Raise(new UserRegisteredDomainEvent(Id)); // ✅ domain invariant
+}
+```
+
+### 1.4 Value Objects
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `Email` | ⚠️ Partial | Throws `ArgumentException` instead of returning `Result`. Inconsistent with the `Result` pattern used everywhere else. |
+| `Synonyms` | ✅ Good | Proper VO |
+
+**Fix suggestion:**
+```csharp
+public static Result<Email> Create(string value) { ... }
+```
+  if (!IsValidEmail(value))
+    {
+        return Result.Failure<<Email>(EmailErrors.InvalidFormat);  // ✅
+    }
+
+### 1.5 Entity Base Class
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `SharedKernel.Entity` | ⚠️ Missing | No `[Timestamp] RowVersion`. No audit fields (`CreatedAt`, `UpdatedAt`). |
+
+**Risk:** No optimistic concurrency control. Two simultaneous flashcard reviews can silently overwrite each other's `SrsState`.
+
+---
+
+### Co to jest Optimistic Concurrency Control?
+
+**Optimistic Concurrency** = zakładamy, że konflikty są rzadkie. Nie blokujemy rekordów w bazie, ale sprawdzamy czy nikt ich nie zmienił przed zapisem.
+
+**Przykład scenariusza (bez RowVersion):**
+
+```
+Czas T0: Flashcard w bazie ma SrsState.Interval = 10
+Czas T1: User A odczytuje Flashcard (Interval = 10)
+Czas T2: User B odczytuje Flashcard (Interval = 10)
+Czas T3: User A wysyła review "Easy" → Interval = 15 → zapisuje
+Czas T4: User B wysyła review "Again" → Interval = 1 → zapisuje
+```
+
+**Problem:** Zmiana User A (Interval = 15) jest nadpisana przez User B (Interval = 1). User A traci postęp.
+
+---
+
+### Jak działa [Timestamp] RowVersion w EF Core?
+
+`[Timestamp]` to atrybut EF Core, który automatycznie:
+
+1. Tworzy kolumnę `rowversion` w SQL Server (typ `rowversion`/`timestamp`)
+2. Automatycznie aktualizuje tę kolumnę przy każdym UPDATE
+3. Sprawdza czy wartość się zmieniła przed zapisem
+
+**Przykład scenariusza (z RowVersion):**
+
+```
+Czas T0: Flashcard w bazie ma SrsState.Interval = 10, RowVersion = 0x0001
+Czas T1: User A odczytuje Flashcard (Interval = 10, RowVersion = 0x0001)
+Czas T2: User B odczytuje Flashcard (Interval = 10, RowVersion = 0x0001)
+Czas T3: User A wysyła review "Easy" → Interval = 15 → zapisuje z WHERE RowVersion = 0x0001
+        → SUKCES, RowVersion aktualizuje się do 0x0002
+Czas T4: User B wysyła review "Again" → Interval = 1 → zapisuje z WHERE RowVersion = 0x0001
+        → BŁĄD! RowVersion w bazie = 0x0002, ale User B ma 0x0001
+        → EF Core rzuca DbUpdateConcurrencyException
+```
+
+**Wynik:** User B otrzymuje błąd 409 Conflict, może pobrać świeże dane i spróbować ponownie.
+
+---
+
+### Dlaczego audit fields są ważne?
+
+**CreatedAt / UpdatedAt:**
+- **Audyt:** Kiedy encja została utworzona/zmodyfikowana
+- **Debugging:** Śledzenie kiedy nastąpiła zmiana
+- **Compliance:** Wymogi regulacyjne (GDPR, SOX, HIPAA)
+- **Temporal Queries:** "Pokaż mi wszystkie encje zmodyfikowane w ostatnim tygodniu"
+
+---
+
+### Implementacja
+
+**1. Dodaj do Entity.cs:**
+```csharp
+@/c:\Repos\Piotr\src\SharedKernel\Entity.cs:1-19
+public abstract class Entity
+{
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    public List<IDomainEvent> DomainEvents => [.. _domainEvents];
+
+    public void ClearDomainEvents()
+    {
+        _domainEvents.Clear();
+    }
+
+    public void Raise(IDomainEvent domainEvent)
+    {
+        _domainEvents.Add(domainEvent);
+    }
+
+    // Optimistic Concurrency
+    [Timestamp]
+    public byte[]? RowVersion { get; protected set; }
+
+    // Audit Fields
+    public DateTime CreatedAt { get; protected set; }
+    public DateTime? UpdatedAt { get; protected set; }
+
+    protected Entity()
+    {
+        CreatedAt = DateTime.UtcNow;
+    }
+
+    public void SetUpdatedAt()
+    {
+        UpdatedAt = DateTime.UtcNow;
+    }
+}
+```
+
+**2. Obsłuż DbUpdateConcurrencyException w middleware:**
+```csharp
+// GlobalExceptionHandler lub w handlerach
+catch (DbUpdateConcurrencyException ex)
+{
+    return Results.Conflict(new { error = "Concurrency conflict - record was modified by another user" });
+}
+```
+
+**3. EF Core Configuration (opcjonalne):**
+```csharp
+// W Configuration classes
+builder.Property(e => e.CreatedAt)
+    .HasDefaultValueSql("GETUTCDATE()")
+    .ValueGeneratedOnAdd();
+
+builder.Property(e => e.UpdatedAt)
+    .ValueGeneratedOnAddOrUpdate();
+```
+
+---
+
+### Alternatywy
+
+| Aproach | Zalety | Wady |
+|---------|--------|------|
+| **[Timestamp] RowVersion** | Automatyczne, wydajne w SQL Server | Tylko SQL Server |
+| **DateTime Version** | Cross-database | Wymaga ręcznej aktualizacji, precision issues |
+| **ConcurrencyCheck (int)** | Cross-database | Wymaga ręcznej inkrementacji |
+| **Pessimistic Locking** | Gwarantuje consistency | Blokuje inne operacje, skalowalność |
+
+**Rekomendacja:** `[Timestamp] RowVersion` dla SQL Server (obecna konfiguracja).
+
+---
+
+### Impact na Migrations
+
+Po dodaniu pól do `Entity.cs`:
+
+1. Uruchom `dotnet ef migrations add AddRowVersionAndAuditFields`
+2. Migration doda kolumny do wszystkich tabel dziedziczących po `Entity`
+3. Dla istniejących danych: `CreatedAt` = `GETUTCDATE()`, `RowVersion` = null (ok dla nowych insertów)
+
+---
+
+### Priorytet
+
+**KRYTYCZNE** - Bez RowVersion aplikacja ma race condition bug w core functionality (flashcard reviews).
+
+---
+
+## 2. Application Layer
+
+### 2.1 CQRS & Handlers
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Command handlers | ✅ Good | Thin; delegate to domain |
+| Query handlers | ✅ Good | Separate read models assumed (Dapper repos exist) |
+| Custom handler abstractions | ✅ Good | No MediatR coupling |
+
+### 2.2 Authorization Specifications
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Pattern | ✅ Excellent | `CanAccessFlashcardCollectionSpecification`, `CanAccessLanguageAccountSpecification` |
+| Separation | ✅ Good | No auth logic mixed with business logic in handlers |
+| Implementation | ⚠️ Minor | Uses Read Repositories for authorization queries. Acceptable, but consider caching or a lightweight auth query |
+
+**Evidence:**
+```csharp
+@/c:\Repos\Piotr\src\Application\FlashcardCollection\Commands\AddFlashcardReview\AddFlashcardReviewCommandHandler.cs:30-35
+bool canAccess = await canAccessFlashcardCollectionSpecification.IsSatisfiedByAsync(...);
+```
+
+### 2.3 Repository Abstractions
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `IUserWriteRepository` | ✅ Fixed | `AddAsync` + validation queries only. No entity creation. |
+| `IApplicationDbContext` | ⚠️ Leaky | Exposes `DbSet<FlashcardReview>`, `DbSet<SrsState>`, `DbSet<TodoItem>`, `DbSet<OutboxMessageConsumer>` to Application layer. These are child-entity / infrastructure details that break aggregate encapsulation. |
+
+---
+
+### Co to znaczy "Leaky Abstraction"?
+
+**Leaky Abstraction** = interfejs ujawnia szczegóły implementacji, które powinny być ukryte.
+
+**Przykład:**
+
+```csharp
+// Obecnie (leaky)
+public interface IApplicationDbContext
+{
+    DbSet<User> Users { get; }
+    DbSet<FlashcardCollection> FlashcardCollections { get; }
+    DbSet<Flashcard> Flashcards { get; }
+    DbSet<FlashcardReview> FlashcardReviews { get; }  // ❌ child entity
+    DbSet<SrsState> SrsStates { get; }                // ❌ child entity
+    DbSet<OutboxMessageConsumer> OutboxMessageConsumers { get; }  // ❌ infrastructure detail
+}
+```
+
+**Dlaczego to jest problem?**
+
+1. **Application layer wie o strukturze bazy danych:**
+   - Handler może bezpośrednio query `FlashcardReviews` - omija aggregate root
+   - Handler może tworzyć `SrsState` bez `Flashcard` - łamie invariant
+
+2. **Łamie Aggregate Encapsulation:**
+   - W DDD, `FlashcardCollection` jest aggregate root - jedyne wejście do `Flashcard`
+   - `FlashcardReview` jest child entity - powinien być dostępny tylko przez `Flashcard`
+   - Ujawnienie `FlashcardReview` w `IApplicationDbContext` pozwala na bezpośredni dostęp
+
+3. **Infrastructure details w Application layer:**
+   - `OutboxMessageConsumer` to szczegół implementacji outbox pattern
+   - Application layer nie powinien wiedzieć o tym
+
+---
+
+### Przykład problemu
+
+**Bez leaky abstraction (poprawnie):**
+```csharp
+// Handler używa aggregate root
+var collection = await flashcardCollectionRepository.GetByIdAsync(id);
+var flashcard = collection.Flashcards.First(f => f.Id == flashcardId);
+var review = flashcard.AddReview(...);  // ✅ przez aggregate
+```
+
+**Z leaky abstraction (niepoprawnie):**
+```csharp
+// Handler omija aggregate root
+var review = new FlashcardReview(...);
+await applicationDbContext.FlashcardReviews.AddAsync(review);  // ❌ bezpośredni dostęp
+await applicationDbContext.SaveChangesAsync();
+// ❌ Flashcard nie wie o review - invariant broken
+```
+
+---
+
+### Fix: Remove child-entity DbSets
+
+**Poprawiony interfejs:**
+```csharp
+public interface IApplicationDbContext
+{
+    // Aggregate roots
+    DbSet<User> Users { get; }
+    DbSet<LanguageAccount> LanguageAccounts { get; }
+    DbSet<FlashcardCollection> FlashcardCollections { get; }
+    DbSet<Flashcard> Flashcards { get; } // optional, można load via collection
+
+    // Infrastructure (outbox)
+    DbSet<OutboxMessage> OutboxMessages { get; }
+
+    // USUNIĘTE:
+    // DbSet<FlashcardReview> FlashcardReviews { get; }      ❌ child entity
+    // DbSet<SrsState> SrsStates { get; }                    ❌ child entity
+    // DbSet<TodoItem> TodoItems { get; }                    ❌ boilerplate
+    // DbSet<OutboxMessageConsumer> OutboxMessageConsumers { get; }  ❌ infrastructure detail
+}
+```
+
+**Jak teraz Application layer uzyskuje dostęp do child entities?**
+```csharp
+// Przez aggregate root
+var collection = await flashcardCollectionRepository.GetByIdAsync(id);
+var flashcard = collection.Flashcards.First(f => f.Id == flashcardId);
+var reviews = flashcard.Reviews;  // ✅ przez aggregate
+```
+
+**Co z OutboxMessageConsumer?**
+```csharp
+// Infrastructure layer ma dostęp do pełnego DbContext
+// Background service używa ApplicationDbContext (nie IApplicationDbContext)
+public class OutBoxMessagesBackgroundService
+{
+    private readonly ApplicationDbContext _dbContext;  // ❌ nie IApplicationDbContext
+    // ... może używać OutboxMessageConsumers
+}
+```
+
+---
+
+### Dlaczego to ważne?
+
+- **Encapsulation:** Application layer nie wie o strukturze agregatów
+- **Invariant protection:** Wszystkie operacje na child entities idą przez aggregate root
+- **Testability:** Łatwiej mockować interfejs z mniejszą liczbą DbSets
+- **Maintainability:** Zmiana struktury agregatu nie wymaga zmiany w Application layer
+
+### 2.4 Outbox Pattern
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Outbox entity | ✅ Good | Serialization, retry count, errors |
+| Background processor | ✅ Good | Reflection-based handler resolution, idempotency via `OutboxMessageConsumer` |
+| Transaction safety | ⚠️ Risk | `SaveChangesAsync` called per message without explicit `BeginTransaction` / `CommitTransaction`. Partial failure can leave `OutboxMessageConsumer` saved while message stays unprocessed. |
+
+---
+
+### Co to jest Outbox Pattern?
+
+**Outbox Pattern** = gwarantuje, że domain events zostaną dostarczone nawet jeśli handler fail.
+
+**Flow:**
+1. Domain event podnoszony w encji
+2. `SaveChangesAsync` tworzy `OutboxMessage` w tej samej transakcji co encja
+3. Background service przetwarza `OutboxMessage` asynchronicznie
+4. Jeśli handler fail → retry po 10 sekundach
+
+---
+
+### Obecna implementacja
+
+```csharp
+// OutBoxMessagesBackgroundService.cs:33-110
+foreach (var outboxMessage in outboxMessages)
+{
+    // ... deserialize event ...
+    
+    try
+    {
+        await handlerWrapper.Handle(domainEvent, stoppingToken);
+
+        dbContext.OutboxMessageConsumers.Add(new OutboxMessageConsumer
+        {
+            OutboxMessageId = outboxMessage.Id,
+            HandlerType = handlerTypeName,
+            ProcessedOnUtc = _dateTimeProvider.UtcNow
+        });
+    }
+    catch (Exception ex)
+    {
+        isSucceded = false;
+        outboxMessage.Error = $"Failed to process...";
+    }
+    
+    if(isSucceded)
+    {
+        outboxMessage.ProcessedOnUtc = _dateTimeProvider.UtcNow;
+    }
+    else
+    {
+        outboxMessage.RetryCount += 1;
+    }
+
+    await dbContext.SaveChangesAsync(stoppingToken);  // ❌ bez transakcji
+}
+```
+
+---
+
+### Problem: Brak Explicit Transaction
+
+**Scenariusz race condition:**
+
+```
+Czas T0: OutboxMessage w bazie (ProcessedOnUtc = null)
+Czas T1: Handler A rozpoczyna przetwarzanie
+Czas T2: Handler A dodaje OutboxMessageConsumer (ProcessedOnUtc = now)
+Czas T3: Handler A oznacza OutboxMessage jako processed (ProcessedOnUtc = now)
+Czas T4: SaveChangesAsync FAIL ❌ (connection timeout)
+Czas T5: OutboxMessageConsumer NIE jest zapisany (rollback)
+Czas T6: OutboxMessage.ProcessedOnUtc NIE jest zapisany (rollback)
+Czas T7: Background service restartuje po 10 sekundach
+Czas T8: Handler B przetwarza ten sam OutboxMessage
+Czas T9: Handler B dodaje OutboxMessageConsumer (drugi raz!)
+Czas T10: Handler B oznacza OutboxMessage jako processed
+Czas T11: SaveChangesAsync SUCCESS ✅
+```
+
+**Problem:** OutboxMessageConsumer został dodany dwukrotnie → handler wykonany dwa razy → nieidempotentny.
+
+---
+
+### Fix: Explicit Transaction
+
+```csharp
+foreach (var outboxMessage in outboxMessages)
+{
+    using var transaction = await dbContext.BeginTransactionAsync(cancellationToken);
+    
+    try
+    {
+        // ... deserialize event ...
+        
+        bool alreadyProcessed = dbContext.OutboxMessageConsumers
+            .Any(c => c.OutboxMessageId == outboxMessage.Id && c.HandlerType == handlerTypeName);
+
+        if (alreadyProcessed)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            continue;
+        }
+
+        await handlerWrapper.Handle(domainEvent, cancellationToken);
+
+        dbContext.OutboxMessageConsumers.Add(new OutboxMessageConsumer
+        {
+            OutboxMessageId = outboxMessage.Id,
+            HandlerType = handlerTypeName,
+            ProcessedOnUtc = _dateTimeProvider.UtcNow
+        });
+
+        outboxMessage.ProcessedOnUtc = _dateTimeProvider.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);  // w transakcji
+        await transaction.CommitAsync(cancellationToken);  // commit
+    }
+    catch (Exception ex)
+    {
+        await transaction.RollbackAsync(cancellationToken);  // rollback
+        outboxMessage.RetryCount += 1;
+        await dbContext.SaveChangesAsync(cancellationToken);  // zapisz retry count
+    }
+}
+```
+
+---
+
+### Dlaczego to naprawia problem?
+
+**Z explicit transaction:**
+
+```
+Czas T0: BeginTransaction
+Czas T1: Handler dodaje OutboxMessageConsumer
+Czas T2: Handler oznacza OutboxMessage jako processed
+Czas T3: SaveChangesAsync FAIL ❌
+Czas T4: RollbackAsync → OutboxMessageConsumer usunięty, OutboxMessage.ProcessedOnUtc cofnięty
+Czas T5: RetryCount zapisany w osobnej transakcji
+Czas T6: Background service restartuje po 10 sekundach
+Czas T7: Handler przetwarza ponownie (czysty stan)
+```
+
+**Wynik:** Brak duplikatów, idempotentne przetwarzanie.
+
+---
+
+### Alternatywa: Single Transaction dla Wszystkich Message
+
+Można też użyć jednej transakcji dla całej partii:
+
+```csharp
+using var transaction = await dbContext.BeginTransactionAsync(cancellationToken);
+
+try
+{
+    foreach (var outboxMessage in outboxMessages)
+    {
+        // ... process message ...
+    }
+    
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await transaction.CommitAsync(cancellationToken);
+}
+catch
+{
+    await transaction.RollbackAsync(cancellationToken);
+    throw;
+}
+```
+
+**Zalety:** Mniej transakcji, wydajniejsze
+**Wady:** Jeśli jeden message fail → wszystkie się cofają
+
+**Rekomendacja:** Transakcja per message (jak w fix powyżej) dla better isolation.
+
+### 2.5 DI & Decorators
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Scrutor scanning | ✅ Good | Auto-registers handlers, validators, domain event handlers |
+| Decorators | ✅ Excellent | `ValidationDecorator`, `LoggingDecorator` for cross-cutting concerns |
+| `SrsCalculationService` lifetime | ⚠️ Minor | `Singleton`. Stateless so OK, but `Scoped` is more consistent. |
+
+---
+
+## 3. Infrastructure Layer
+
+### 3.1 Database
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `ApplicationDbContext` | ✅ Good | Sealed. Outbox written before `base.SaveChangesAsync`. |
+| Migrations | ✅ Good | Dev/Docker auto-apply via middleware |
+| Schema | ✅ Good | Default `dbo` |
+
+### 3.2 Authentication
+
+| Item | Status | Detail |
+|------|--------|--------|
+| JWT Bearer | ✅ Good | Standard configuration |
+| `IPasswordHasher` | ⚠️ Verify | Implementation not reviewed. Ensure bcrypt/Argon2/ASP.NET Identity V3 — not SHA256. |
+| `IUserContext` | ✅ Good | Extracts `sub` claim from `HttpContext` |
+
+### 3.3 Time Abstraction
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `IDateTimeProvider` | ✅ Excellent | Abstracts `DateTime.UtcNow`. Enables deterministic SRS algorithm tests. |
+
+---
+
+## 4. Presentation Layer
+
+### 4.1 API Design
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Minimal APIs + `IEndpoint` | ✅ Excellent | Modern, clean, testable |
+| Auto endpoint discovery | ✅ Good | Assembly scanning |
+| Route nesting | ⚠️ Verbose | `/language-accounts/{id}/collections/{id}/flashcards/{id}/reviews` is 4 levels deep. Consider `/flashcards/{id}/reviews` + auth spec check. |
+| `RequireAuthorization()` | ✅ Good | Consistent |
+
+### 4.2 Exception Handling
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `GlobalExceptionHandler` | ✅ Good | `IExceptionHandler` (.NET 8+ pattern) |
+| `CustomResults.Problem` | ✅ Good | Maps `Result.Error` to correct HTTP status |
+| Concurrency exceptions | ❌ Missing | No `DbUpdateConcurrencyException` handling. With no `RowVersion`, silent data loss is possible. |
+
+---
+
+## 5. SharedKernel
+
+| Item | Status | Detail |
+|------|--------|--------|
+| `Result` / `Result<T>` | ✅ Good | Clean, with implicit conversion |
+| `Error` types | ✅ Good | `ValidationError`, `ErrorType` enum |
+| `Entity` base | ⚠️ Minimal | Missing concurrency + audit |
+
+---
+
+## 6. Testing
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Architecture tests | ✅ Present | Layer dependency verification |
+| Unit tests | ❌ Missing | No `Domain.Tests`. `SrsCalculationService` (core business logic) has **zero tests**. |
+| Integration tests | ❌ Missing | No end-to-end API tests |
+
+**Critical:** A  practicing modern patterns must test the SM-2 algorithm exhaustively.
+
+---
+
+## 7. Technical Debt
+
+### 7.1 TodoItem Boilerplate
+
+**Status:** ❌ Remove before production  
+`Domain.Todos` + `Application.Todos` + `Web.Api.Endpoints.Todos` appear to be template code. They pollute the domain model and confuse the actual bounded context boundaries.
+
+### 7.2 Magic Numbers in SRS Algorithm
+
+```csharp
+@/c:\Repos\Piotr\src\Domain\FlashcardCollection\DomainServices\SrsCalculationService.cs
+newEaseFactor += 0.15;  // Easy
+newEaseFactor += 0.05;  // Know
+newEaseFactor -= 0.2;   // Again/DontKnow
+```
+
+Should be named constants with XML docs linking to SM-2 paper.
+
+### 7.3 Guid.NewGuid() in Constructors
+
+All entities generate their own IDs. This is pragmatic (Option B from earlier reviews). For .NET 9+, consider `Guid.CreateVersion7()` for better database index performance.
+
+---
+
+## 8. Compliance with AI Plan Files
+
+| Plan Requirement | Status |
+|------------------|--------|
+| 2-3 Bounded Contexts for MVP | ✅ Compliant |
+| No Grammar / Essay / AI | ✅ Compliant |
+| No Token System in MVP | ✅ Compliant |
+| SRS inside Flashcard System Context | ✅ Compliant |
+| `SpacedRepetitionService` as Domain Service | ✅ Compliant |
+| FlashcardCollection independent aggregate | ✅ Compliant |
+| 5-8 domain events | ⚠️ Partial (~4) |
+| 4-5 repositories | ✅ Compliant (~7 incl. read repos) |
+| Iterative deployment | ❓ Unknown — Dockerfile exists |
+
+---
+
+## 9. Recommendations
+
+### Immediate (This Week)
+
+1. **Add `SrsCalculationService` unit tests** — all `ReviewResult` combinations, boundary conditions, midnight scenarios.
+2. **Remove `TodoItem` boilerplate** — delete `Domain.Todos`, `Application.Todos`, `Web.Api.Endpoints.Todos`, remove from `ApplicationDbContext`, re-migrate.
+3. **Add `[Timestamp] RowVersion`** to `SharedKernel.Entity` and handle `DbUpdateConcurrencyException` in middleware or handlers.
+4. **Fix Outbox transaction safety** — wrap each message processing in explicit `BeginTransaction` / `CommitTransaction`.
+
+### Short-Term (2 Weeks)
+
+5. **Move domain event raising into entity constructors** for `UserRegisteredDomainEvent` and `FlashcardCollectionCreatedDomainEvent`. Keep `FlashcardReviewedDomainEvent` where it is (already correct).
+6. **Refactor `IApplicationDbContext`** — remove child-entity and infrastructure `DbSet`s. Only aggregate roots belong there.
+7. **Make `Email.Create` return `Result<Email>`** instead of throwing.
+8. **Add ADRs** (`/docs/adr/`) documenting: Outbox vs immediate dispatch, Specification pattern vs middleware auth, custom handlers vs MediatR.
+
+### Medium-Term (1 Month)
+
+9. **Add integration tests** covering the full happy path: Register → Create Language Account → Create Collection → Add Flashcard → Review Flashcard → Assert SRS state.
+10. **Consider Vertical Slice Architecture** — group by feature (`Features/FlashcardReviews/{Domain,Application,Api}`) rather than technical layer for better modularity.
+
+---
+
+## 10. Scorecard
+
+| Category | Score | Max |
+|----------|-------|-----|
+| Aggregate Design | 9/10 | 10 |
+| Domain Services | 10/10 | 10 |
+| Domain Events | 6/10 | 10 |
+| Value Objects | 6/10 | 10 |
+| CQRS / Handlers | 9/10 | 10 |
+| Authorization | 9/10 | 10 |
+| Repository Design | 7/10 | 10 |
+| Outbox / Event Dispatch | 8/10 | 10 |
+| API Design | 9/10 | 10 |
+| Test Coverage | 2/10 | 10 |
+| Concurrency / Safety | 4/10 | 10 |
+| **Total** | **79/110** | **110** |
+
+**Summary:** Strong architecture with excellent CQRS, authorization, and domain service patterns. The biggest blockers to reference-grade quality are: **missing tests**, **missing concurrency control**, **leaky `IApplicationDbContext`**, and **delayed domain event raising**.
+
+---
+
+## 11. Weryfikacja
+
+### 11.1 Uwagi Zweryfikowane ✅
+
+Po przeanalizowaniu kodu źródłowego potwierdzam następujące uwagi z code review:
+
+| # | Uwaga z Code Review | Status w Kodzie | Ewidencja |
+|---|---------------------|-----------------|-----------|
+| 1 | `SrsState` jako child `Flashcard` | ✅ PRAWDA | `Flashcard.cs:18` |
+| 2 | `Flashcard.AddReview` podnosi event atomically | ✅ PRAWDA | `Flashcard.cs:82` |
+| 3 | `SrsCalculationService` stateless | ✅ PRAWDA | `SrsCalculationService.cs:10-81` |
+| 4 | `Email` rzuca `ArgumentException` | ✅ PRAWDA | `Email.cs:16` |
+| 5 | Brak `RowVersion` w `Entity` | ✅ PRAWDA | `Entity.cs:1-19` |
+| 6 | `IApplicationDbContext` ujawnia child entities | ✅ PRAWDA | `IApplicationDbContext.cs:17-20` |
+| 7 | Outbox bez transakcji | ✅ PRAWDA | `OutBoxMessagesBackgroundService.cs:110` |
+| 8 | `UserRegisteredDomainEvent` w handlerze | ✅ PRAWDA | `RegisterUserCommandHandler.cs:34` |
+| 9 | `FlashcardCollectionCreatedDomainEvent` w handlerze | ✅ PRAWDA | `CreateFlashcardCollectionCommandHandler.cs:44` |
+| 10 | `TodoItem` boilerplate | ✅ PRAWDA | `Domain.Todos\TodoItem.cs` |
+| 11 | Brak testów dla `SrsCalculationService` | ✅ PRAWDA | Tylko `ArchitectureTests` |
+
+### 11.2 Dodatkowe Uwagi 
+
+#### 11.2.1 Brak Soft Delete Pattern
+
+**Obserwacja:** Encje nie mają mechanizmu soft delete. `DeleteLanguageAccountCommandHandler` usuwa rekord fizycznie (`Remove()`).
+
+**Ryzyko:** Utrata danych historycznych, problemy z audytem, cascade deletes mogą być niebezpieczne.
+
+**Rekomendacja:** Rozważ `IsDeleted` + `DeletedAt` z global query filter w EF Core.
+
+#### 11.2.2 IDateTimeProvider - Brak Implementacji w Domain
+
+**Obserwacja:** `SrsCalculationService.CalculateNextState` przyjmuje `DateTime currentTime` jako parametr, ale `Flashcard.Create` i `Flashcard.AddReview` też przyjmują `DateTime currentTime`.
+
+**Ryzyko:** Wyciek infrastruktury do domain layer przez parametry. Domain nie powinien wiedzieć o czasie z zewnątrz - powinien używać abstrakcji.
+
+**Rekomendacja:** Rozważ injecting `IDateTimeProvider` do domain services lub użycie `TimeProvider` (.NET 8+) w Domain.
+
+#### 11.2.3 Magic Numbers w SRS Algorithm
+
+**Obserwacja:** `SrsCalculationService.cs:61,65,37` ma hardcoded wartości:
+```csharp
+newEaseFactor += 0.15;  // Easy
+newEaseFactor += 0.05;  // Know
+newEaseFactor -= 0.2;   // Again/DontKnow
+```
+
+**Ryzyko:** Brak dokumentacji, trudne do utrzymania, brak powiązań z SM-2 paper.
+
+**Rekomendacja:** Użyj named constants z XML doc:
+```csharp
+private const double EASE_FACTOR_INCREASE_EASY = 0.15; // SM-2: q=5
+private const double EASE_FACTOR_INCREASE_KNOW = 0.05; // SM-2: q=4
+private const double EASE_FACTOR_DECREASE_FAIL = 0.2;  // SM-2: q<3
+```
+
+#### 11.2.4 Guid.NewGuid() w Konstruktorach
+
+**Obserwacja:** Wszystkie encje generują ID w konstruktorach (`Guid.NewGuid()`).
+
+**Ryzyko:** Fragmentacja indeksów w SQL Server, słaba wydajność przy dużych wolumenach.
+
+**Rekomendacja:** Dla .NET 9+ użyj `Guid.CreateVersion7()` dla sekwencyjnych GUIDów lepszych dla clustering.
+
+#### 11.2.5 Brak Domain Events w User.Create i FlashcardCollection.Create
+
+**Obserwacja:** `User.Create` i `FlashcardCollection.Create` nie podnoszą events. Events są podnoszone w handlerach.
+
+**Ryzyko:** Domain nie enforce invariants. Jeśli ktoś wywoła `User.Create()` bezpośrednio (np. w testach lub innym handlerze), event nie zostanie podniesiony.
+
+**Rekomendacja:** Przenieś `Raise()` do factory methods w encjach, aby domain guarantee events.
+
+#### 11.2.6 Outbox - Brak Idempotency dla Handler Failure
+
+**Obserwacja:** `OutBoxMessagesBackgroundService.cs:92-100` dodaje `OutboxMessageConsumer` po sukcesie handlera, ale jeśli `SaveChangesAsync` fail na linii 110, `OutboxMessageConsumer` nie jest zapisany, ale message może być oznaczony jako processed (linia 103).
+
+**Ryzyko:** Race condition: handler succeeds, consumer added, but SaveChanges fails → message reprocessed → duplicate handler execution.
+
+**Rekomendacja:** Użyj explicit transaction wokół całej operacji processing:
+```csharp
+using var transaction = await dbContext.BeginTransactionAsync(cancellationToken);
+try {
+    // ... process handler ...
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await transaction.CommitAsync(cancellationToken);
+} catch {
+    await transaction.RollbackAsync(cancellationToken);
+    throw;
+}
+```
+
+#### 11.2.7 Brak Global Exception Handling dla Concurrency
+
+**Obserwacja:** `GlobalExceptionHandler` istnieje, ale nie obsługuje `DbUpdateConcurrencyException`.
+
+**Ryzyko:** Bez `RowVersion` concurrency exceptions nie wystąpią, ale nawet z `RowVersion` brak handling spowoduje 500 zamiast 409 Conflict.
+
+**Rekomendacja:** Dodaj handling w middleware:
+```csharp
+catch (DbUpdateConcurrencyException ex) {
+    return Results.Conflict(new { error = "Concurrency conflict" });
+}
+```
+
+#### 11.2.8 Specifications - Brak Caching
+
+**Obserwacja:** `CanAccessFlashcardCollectionSpecification` i `CanAccessLanguageAccountSpecification` wykonują zapytania do bazy przy każdym sprawdzeniu.
+
+**Ryzyko:** N+1 problem przy listach, redundant queries w jednym request.
+
+**Rekomendacja:** Rozważ caching wyników specyfikacji per request (scoped cache) lub użycie `IMemoryCache` z krótkim TTL.
+
+#### 11.2.9 Brak Input Sanitization
+
+**Obserwacja:** `Flashcard.Create` i `Flashcard.Update` nie sanitizują input (HTML, XSS).
+
+**Ryzyko:** XSS vulnerability jeśli dane są wyświetlane w UI bez encoding.
+
+**Rekomendacja:** Dodaj sanitization w VOs lub w application layer przed zapisem.
+
+### 11.3 Priorytety Napraw
+
+**Krytyczne (tydzień):**
+1. Dodaj `RowVersion` do `Entity` + handling `DbUpdateConcurrencyException`
+2. Dodaj transakcje w `OutBoxMessagesBackgroundService`
+3. Napisz testy dla `SrsCalculationService`
+4. Usuń `TodoItem` boilerplate
+
+**Ważne (2 tygodnie):**
+5. Przenieś domain events do encji (`User.Create`, `FlashcardCollection.Create`)
+6. Usuń child entities z `IApplicationDbContext`
+7. Zmień `Email.Create` na returning `Result<Email>`
+8. Dodaj soft delete pattern
+
+**Możliwe (1 miesiąc):**
+9. Użyj `Guid.CreateVersion7()` dla nowych encji
+10. Dodaj caching do specifications
+11. Refactor SRS magic numbers do constants
+12. Dodaj input sanitization

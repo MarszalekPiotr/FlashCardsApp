@@ -48,6 +48,9 @@ app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
+// ✅ Add CORS - MUST be before Authentication
+app.UseCors();
+
 app.UseAuthentication();
 
 app.UseAuthorization();

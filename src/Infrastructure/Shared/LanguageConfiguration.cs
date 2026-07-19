@@ -20,14 +20,14 @@ internal class LanguageConfiguration : IEntityTypeConfiguration<Language>
             .HasMaxLength(5);
 
         builder.HasData(
-            new Language { Id = Guid.NewGuid(), Name = "English", Code = "EN", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "Spanish", Code = "ES", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "French", Code = "FR", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "German", Code = "DE", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "Chinese", Code = "ZH", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "Japanese", Code = "JA", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "Russian", Code = "RU", IsActive = true },
-            new Language { Id = Guid.NewGuid(), Name = "Polish", Code = "PL", IsActive = true }
+            new Language { Id = new Guid("11111111-1111-1111-1111-111111111111"), Name = "English", Code = "EN", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("22222222-2222-2222-2222-222222222222"), Name = "Spanish", Code = "ES", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("33333333-3333-3333-3333-333333333333"), Name = "French", Code = "FR", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("44444444-4444-4444-4444-444444444444"), Name = "German", Code = "DE", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("55555555-5555-5555-5555-555555555555"), Name = "Chinese", Code = "ZH", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("66666666-6666-6666-6666-666666666666"), Name = "Japanese", Code = "JA", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("77777777-7777-7777-7777-777777777777"), Name = "Russian", Code = "RU", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Language { Id = new Guid("88888888-8888-8888-8888-888888888888"), Name = "Polish", Code = "PL", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
             );
     }
 }

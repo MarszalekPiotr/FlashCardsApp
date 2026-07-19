@@ -22,6 +22,8 @@ using Microsoft.IdentityModel.Tokens;
 using SharedKernel;
 using Application.FlashcardCollection;
 using Infrastructure.FlashcardCollection;
+using Application.Shared;
+using Infrastructure.Shared.Repositories;
 
 namespace Infrastructure;
 
@@ -66,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<IFlashcardCollectionReadRepository, FlashcardCollectionReadRepository>();
 
         services.AddScoped<ILanguageAccountReadRepository, LanguageAccountReadRepository>();
+
+        services.AddScoped<ILanguageReadRepository, LanguageReadRepository>();
 
         services.AddScoped<IFlashcardRepository, FlashcardRepository>();
 

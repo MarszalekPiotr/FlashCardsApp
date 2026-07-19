@@ -25,7 +25,7 @@ internal sealed class GetUserByEmailQueryHandler(IUserContext userContext, IUser
         var userResponse = new UserResponse
         {
             Id = user.Id,
-            Email = user.Email.Value,
+            Email = user.Email,
             FirstName = user.FirstName,
             LastName = user.LastName
         };

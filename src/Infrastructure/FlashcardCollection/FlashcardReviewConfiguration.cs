@@ -11,10 +11,14 @@ internal sealed class FlashcardReviewConfiguration : IEntityTypeConfiguration<Fl
     {
         builder.HasKey(fr => fr.Id);
 
-
-
         builder.Property(fr => fr.ReviewDate).IsRequired();
 
         builder.Property(fr => fr.FlashcardId).IsRequired();
+
+        // Configure the relationship explicitly to avoid shadow property FlashcardId1
+        builder.HasOne<Flashcard>()
+            .WithMany(f => f.Reviews)
+            .HasForeignKey(fr => fr.FlashcardId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

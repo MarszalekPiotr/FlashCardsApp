@@ -12,7 +12,8 @@ internal sealed class DeleteFlashcardCollectionCommandHandler(
     IFlashcardCollectionRepository flashcardCollectionRepository,
     IApplicationDbContext applicationDbContext,
     IUserContext userContext,
-    CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification)
+    CanAccessFlashcardCollectionSpecification canAccessFlashcardCollectionSpecification,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<DeleteFlashcardCollectionCommand>
 {
     public async Task<Result> Handle(DeleteFlashcardCollectionCommand command, CancellationToken cancellationToken)
@@ -32,7 +33,7 @@ internal sealed class DeleteFlashcardCollectionCommandHandler(
             return Result.Failure(AuthorizationError.Forbidden());
         }
 
-        flashcardCollectionRepository.Remove(collection);
+        collection.Delete(dateTimeProvider.UtcNow);
         await applicationDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

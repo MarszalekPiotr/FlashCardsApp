@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Web.Api.Infrastructure;
 
@@ -11,6 +12,23 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
         Exception exception,
         CancellationToken cancellationToken)
     {
+        if (exception is DbUpdateConcurrencyException)
+        {
+            logger.LogWarning(exception, "Concurrency conflict detected");
+
+            var conflictDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+                Title = "Concurrency conflict",
+                Detail = "The record was modified by another request. Please reload and try again."
+            };
+
+            httpContext.Response.StatusCode = conflictDetails.Status.Value;
+            await httpContext.Response.WriteAsJsonAsync(conflictDetails, cancellationToken);
+            return true;
+        }
+
         logger.LogError(exception, "Unhandled exception occurred");
 
         var problemDetails = new ProblemDetails
@@ -21,9 +39,7 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
         };
 
         httpContext.Response.StatusCode = problemDetails.Status.Value;
-
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
-
         return true;
     }
 }

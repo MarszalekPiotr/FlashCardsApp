@@ -4,6 +4,7 @@ using Application.Users;
 using Domain.Users;
 using Domain.Users.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 
 namespace Infrastructure.Users;
 
@@ -20,8 +21,14 @@ public class UserWriteRepository : BaseWriteRepository, IUserWriteRepository
 
     public async Task<bool> UserExists(string email, CancellationToken cancellationToken)
     {
-        var emailValueObject = new Email(email);
+        Result<Email> emailResult = Email.Create(email);
+        if (emailResult.IsFailure)
+        {
+            // An invalid email can never match a stored user — no need to query the DB.
+            return false;
+        }
+
         return await _applicationDbContext.Users
-            .AnyAsync(u => u.Email == emailValueObject, cancellationToken);
+            .AnyAsync(u => u.Email == emailResult.Value, cancellationToken);
     }
 }

@@ -12,7 +12,9 @@
     <Project Path="src/Web.Api/Web.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Application.Tests/Application.Tests.csproj" />
     <Project Path="tests/ArchitectureTests/ArchitectureTests.csproj" />
+    <Project Path="tests/Domain.Tests/Domain.Tests.csproj" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

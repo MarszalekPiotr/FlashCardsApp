@@ -1,8 +1,8 @@
-﻿using System.Text.Json;
+﻿using System.Linq.Expressions;
+using System.Text.Json;
 using Application;
 using Application.Abstractions.Data;
 using Domain.FlashcardCollection;
-using Domain.Todos;
 using Domain.Users;
 using Infrastructure.DomainEvents;
 using Microsoft.EntityFrameworkCore;
@@ -17,8 +17,6 @@ public sealed class ApplicationDbContext(
     : DbContext(options), IApplicationDbContext
 {
     public DbSet<User> Users { get; set; }
-
-    public DbSet<TodoItem> TodoItems { get; set; }
 
     public DbSet<Domain.LanguageAccount.LanguageAccount> LanguageAccounts { get; set; }
 
@@ -39,20 +37,37 @@ public sealed class ApplicationDbContext(
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
         modelBuilder.HasDefaultSchema(Schemas.Default);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+                var property = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+                var filter = Expression.Lambda(Expression.Not(property), parameter);
+                entityType.SetQueryFilter(filter);
+            }
+        }
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        // When should you publish domain events?
-        //
-        // 1. BEFORE calling SaveChangesAsync
-        //     - domain events are part of the same transaction
-        //     - immediate consistency
-        // 2. AFTER calling SaveChangesAsync
-        //     - domain events are a separate transaction
-        //     - eventual consistency
-        //     - handlers can fail
+        // Convert hard deletes to soft deletes for ISoftDeletable entities
+        foreach (var entry in ChangeTracker.Entries<ISoftDeletable>()
+            .Where(e => e.State == EntityState.Deleted))
+        {
+            entry.State = EntityState.Modified;
+            entry.Entity.Delete(dateTimeProvider.UtcNow);
+        }
 
+        // Auto-stamp UpdatedAt for every modified entity
+        foreach (var entry in ChangeTracker.Entries<Entity>())
+        {
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.SetUpdatedAt(dateTimeProvider.UtcNow);
+            }
+        }
 
         await PublishDomainEventsAsync(cancellationToken);
         int result = await base.SaveChangesAsync(cancellationToken);
@@ -103,7 +118,7 @@ public sealed class ApplicationDbContext(
        .SelectMany(e => e.Entity.DomainEvents)
        .Select(domainEvent => new OutboxMessage
        {
-           Id = Guid.NewGuid(),
+           Id = Guid.CreateVersion7(),
            Type = $"{domainEvent.GetType().FullName}, {domainEvent.GetType().Assembly.GetName().Name}",
            Content = JsonSerializer.Serialize(domainEvent),
            OccurredOnUtc = dateTimeProvider.UtcNow

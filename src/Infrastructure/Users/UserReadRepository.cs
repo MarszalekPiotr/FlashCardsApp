@@ -20,7 +20,8 @@ public class UserReadRepository : IUserReadRepository
         string sql = @"
             SELECT TOP 1 Id, Email, FirstName, LastName
             FROM Users
-            WHERE Email = @Email";
+            WHERE Email = @Email
+              AND IsDeleted = 0";
 
 
         IEnumerable<UserReadModel> users = await _dbConnection.QueryAsync<UserReadModel>(
@@ -36,7 +37,8 @@ public class UserReadRepository : IUserReadRepository
         string sql = @"
             SELECT TOP 1 Id, Email, FirstName, LastName
             FROM Users
-            WHERE Id = @UserId";
+            WHERE Id = @UserId
+              AND IsDeleted = 0";
 
         IEnumerable<UserReadModel> users = await _dbConnection.QueryAsync<UserReadModel>(
             sql,
@@ -51,7 +53,8 @@ public class UserReadRepository : IUserReadRepository
         string sql = @"
             SELECT TOP 1 Id, Email, PasswordHash
             FROM Users
-            WHERE Email = @Email";
+            WHERE Email = @Email
+              AND IsDeleted = 0";
 
         IEnumerable<UserAuthReadModel> results = await _dbConnection.QueryAsync<UserAuthReadModel>(
             sql,

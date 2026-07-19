@@ -5,19 +5,21 @@ using SharedKernel;
 
 namespace Domain.LanguageAccount;
 
-public class LanguageAccount : Entity
+public class LanguageAccount : Entity, ISoftDeletable
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
     public User? User { get; private set; }
     public ProficiencyLevel ProficiencyLevel { get; private set; }
     public Guid LanguageId { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAt { get; private set; }
 
     private LanguageAccount() { } // Required by EF Core
 
     private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         UserId = userId;
         ProficiencyLevel = proficiencyLevel;
         LanguageId = languageId;
@@ -32,8 +34,14 @@ public class LanguageAccount : Entity
 
     public void UpdateProficiencyLevel(ProficiencyLevel newLevel)
     {
-        ArgumentNullException.ThrowIfNull(newLevel);      
+        ArgumentNullException.ThrowIfNull(newLevel);
 
         ProficiencyLevel = newLevel;
+    }
+
+    public void Delete(DateTime utcNow)
+    {
+        IsDeleted = true;
+        DeletedAt = utcNow;
     }
 }
