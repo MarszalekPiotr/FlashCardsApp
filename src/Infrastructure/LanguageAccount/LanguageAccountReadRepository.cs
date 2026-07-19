@@ -40,6 +40,7 @@ public class LanguageAccountReadRepository : ILanguageAccountReadRepository
     {
         string sql = @"
             SELECT
+                la.Name,
                 la.Id,
                 la.UserId,
                 l.Code AS LanguageCode,
