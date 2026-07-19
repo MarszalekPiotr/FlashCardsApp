@@ -36,7 +36,8 @@ internal sealed class CreateLanguageAccountCommandHandler(
         var account = Domain.LanguageAccount.LanguageAccount.Create(
             userContext.UserId,
             proficiencyLevel,
-            language.Id);
+            language.Id,
+            command.Name);
 
         await languageAccountRepository.AddAsync(account);
 

@@ -39,7 +39,8 @@ internal sealed class GetLanguageAccountByIdQueryHandler(
             Id = account.Id,
             LanguageCode = account.LanguageCode,
             LanguageFullName = account.LanguageFullName,
-            ProficiencyLevel = account.ProficiencyLevel
+            ProficiencyLevel = account.ProficiencyLevel,
+            Name = account.Name
         };
 
         return response;

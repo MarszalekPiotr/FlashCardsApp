@@ -2,6 +2,7 @@
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using SharedKernel.SharedEntities.Language;
 
 
 namespace Application.Abstractions.Data;
@@ -20,6 +21,8 @@ public interface IApplicationDbContext
     DbSet<Domain.LanguageAccount.LanguageAccount> LanguageAccounts { get; }
     DbSet<Domain.FlashcardCollection.FlashcardCollection> FlashcardCollections { get; }
     DbSet<Flashcard> Flashcards { get; }
+
+    DbSet<Language> Languages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

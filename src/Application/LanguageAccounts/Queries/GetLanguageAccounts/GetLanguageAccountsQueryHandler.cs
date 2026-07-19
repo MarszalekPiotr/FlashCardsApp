@@ -23,7 +23,8 @@ internal sealed class GetLanguageAccountsQueryHandler(
                 Id = a.Id,
                 LanguageCode = a.LanguageCode,
                 LanguageFullName = a.LanguageFullName,
-                ProficiencyLevel = a.ProficiencyLevel
+                ProficiencyLevel = a.ProficiencyLevel,
+                Name = a.Name
             })
             .ToList();
 

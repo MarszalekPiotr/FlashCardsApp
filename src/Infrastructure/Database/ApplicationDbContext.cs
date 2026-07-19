@@ -8,6 +8,7 @@ using Infrastructure.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
+using SharedKernel.SharedEntities.Language;
 
 namespace Infrastructure.Database;
 
@@ -31,6 +32,8 @@ public sealed class ApplicationDbContext(
     public DbSet<OutboxMessage> OutboxMessages {  get; set; }
 
     public DbSet<OutboxMessageConsumer> OutboxMessageConsumers { get; set; }
+
+    public DbSet<Language> Languages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

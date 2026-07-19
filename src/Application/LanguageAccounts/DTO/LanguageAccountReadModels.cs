@@ -7,6 +7,7 @@ public class LanguageAccountListReadModel
     public string LanguageCode { get; set; } = string.Empty;
     public string LanguageFullName { get; set; } = string.Empty;
     public int ProficiencyLevel { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public class LanguageAccountDetailReadModel
@@ -16,4 +17,5 @@ public class LanguageAccountDetailReadModel
     public string LanguageCode { get; set; } = string.Empty;
     public string LanguageFullName { get; set; } = string.Empty;
     public int ProficiencyLevel { get; set; }
+    public string Name { get; set; } = string.Empty;
 }

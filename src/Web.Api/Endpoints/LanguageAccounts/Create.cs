@@ -9,7 +9,7 @@ namespace Web.Api.Endpoints.LanguageAccounts;
 
 internal sealed class Create : IEndpoint
 {
-    public sealed record Request(string LanguageCode, int ProficiencyLevel);
+    public sealed record Request(string LanguageCode, int ProficiencyLevel, string Name);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -18,7 +18,7 @@ internal sealed class Create : IEndpoint
             ICommandHandler<CreateLanguageAccountCommand, Guid> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new CreateLanguageAccountCommand(request.LanguageCode, request.ProficiencyLevel);
+            var command = new CreateLanguageAccountCommand(request.LanguageCode, request.ProficiencyLevel, request.Name);
 
             Result<Guid> result = await handler.Handle(command, cancellationToken);
 

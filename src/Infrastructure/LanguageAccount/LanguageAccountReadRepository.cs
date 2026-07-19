@@ -18,14 +18,17 @@ public class LanguageAccountReadRepository : ILanguageAccountReadRepository
     {
         string sql = @"
             SELECT
-                Id,
-                UserId,
-                JSON_VALUE(Language, '$.Code') AS LanguageCode,
-                JSON_VALUE(Language, '$.FullName') AS LanguageFullName,
-                ProficiencyLevel
-            FROM dbo.LanguageAccounts
-            WHERE UserId = @UserId
-              AND IsDeleted = 0";
+                la.Name,
+                la.Id,
+                la.UserId,
+                l.Code AS LanguageCode,
+                l.Name AS LanguageFullName,
+                la.ProficiencyLevel
+            FROM dbo.LanguageAccounts la
+            INNER JOIN dbo.Languages l
+            ON la.LanguageId = l.Id
+            WHERE la.UserId = @UserId
+            AND la.IsDeleted = 0";
 
         IEnumerable<LanguageAccountListReadModel> result =
             await _dbConnection.QueryAsync<LanguageAccountListReadModel>(sql, new { UserId = userId });
@@ -37,14 +40,16 @@ public class LanguageAccountReadRepository : ILanguageAccountReadRepository
     {
         string sql = @"
             SELECT
-                Id,
-                UserId,
-                JSON_VALUE(Language, '$.Code') AS LanguageCode,
-                JSON_VALUE(Language, '$.FullName') AS LanguageFullName,
-                ProficiencyLevel
-            FROM dbo.LanguageAccounts
-            WHERE Id = @Id
-              AND IsDeleted = 0";
+                la.Id,
+                la.UserId,
+                l.Code AS LanguageCode,
+                l.Name AS LanguageFullName,
+                la.ProficiencyLevel
+            FROM dbo.LanguageAccounts la
+            INNER JOIN dbo.Languages l
+            ON la.LanguageId = l.Id
+            WHERE la.Id = @Id
+              AND la.IsDeleted = 0";
 
         return await _dbConnection.QuerySingleOrDefaultAsync<LanguageAccountDetailReadModel>(sql, new { Id = id });
     }

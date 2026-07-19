@@ -14,22 +14,26 @@ public class LanguageAccount : Entity, ISoftDeletable
     public Guid LanguageId { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+    public string Name {  get; private set; }
 
     private LanguageAccount() { } // Required by EF Core
 
-    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
+    private LanguageAccount(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId, string name)
     {
         Id = Guid.CreateVersion7();
         UserId = userId;
         ProficiencyLevel = proficiencyLevel;
         LanguageId = languageId;
-
+        Name = name;
     }
 
-    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId)
+    
+
+    public static LanguageAccount Create(Guid userId, ProficiencyLevel proficiencyLevel, Guid languageId, string name)
     {
         ArgumentNullException.ThrowIfNull(proficiencyLevel);    
-        return new LanguageAccount(userId, proficiencyLevel, languageId);
+        ArgumentNullException.ThrowIfNull(name);
+        return new LanguageAccount(userId, proficiencyLevel, languageId, name);
     }
 
     public void UpdateProficiencyLevel(ProficiencyLevel newLevel)
